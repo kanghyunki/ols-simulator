@@ -14,6 +14,10 @@ type Hover = any;
 
 const pill = "h-6 rounded-full border border-white/10 bg-white/10 px-2.5 text-[11.5px] font-medium text-white/80 hover:bg-white/20 hover:text-white data-[state=on]:border-white/40 data-[state=on]:bg-white/25 data-[state=on]:text-white";
 const hex = (c: number) => "#" + c.toString(16).padStart(6, "0");
+// Country = last segment of the registry's `sub` ("AYPY · Jacksons Intl · PNG"); long names for the buttons
+const countryOf = (a: any): string => a.sub.split(" · ").pop();
+const COUNTRY: Record<string, string> = { PNG: "Papua New Guinea" };
+const regionCountries = (region: string) => [...new Set(Object.values(AIRPORTS as Record<string, any>).filter((a) => a.region === region).map(countryOf))].sort();
 
 function H({ children }: { children: React.ReactNode }) { return <div className="mt-5 mb-2 text-[13px] font-semibold text-white first:mt-0">{children}</div>; }
 function Note({ children }: { children: React.ReactNode }) { return <p className="mt-1.5 max-w-[250px] text-[10.5px] leading-snug text-white/40">{children}</p>; }
@@ -25,6 +29,7 @@ export function Simulator() {
   const [snap, setSnap] = useState<Snap | null>(null);
   const [hover, setHover] = useState<Hover>(null);
   const [region, setRegion] = useState("OCE");
+  const [country, setCountry] = useState("PNG");
   const [fs, setFs] = useState(false);
 
   useEffect(() => {
@@ -33,7 +38,7 @@ export function Simulator() {
     eng.current = e;
     const id = (location.hash || "").replace("#", "").toUpperCase();
     const start = (AIRPORTS as any)[id] ? id : "PMIA";
-    setRegion((AIRPORTS as any)[start].region);
+    setRegion((AIRPORTS as any)[start].region); setCountry(countryOf((AIRPORTS as any)[start]));
     e.switchAirport(start);
     const ro = new ResizeObserver(() => e.resize()); ro.observe(c);
     const onFs = () => setFs(!!document.fullscreenElement);
@@ -45,7 +50,7 @@ export function Simulator() {
   const set = (p: Record<string, unknown>) => eng.current?.set(p);
   const surf = new Set<string>(st?.surf ?? ALL_KEYS);
   const surfaces = st?.ofz ? [...SURFACES, ...OFZ_SURFACES] : SURFACES;
-  const airports = Object.entries(AIRPORTS as Record<string, any>).filter(([, a]) => a.region === region);
+  const airports = Object.entries(AIRPORTS as Record<string, any>).filter(([, a]) => a.region === region && countryOf(a) === country);
 
   return (
     <div className="fixed inset-0 bg-[#0b0d10] font-sans text-white/80 select-none">
@@ -71,8 +76,13 @@ export function Simulator() {
         </div>
 
         <H>Region</H>
-        <ToggleGroup type="single" value={region} onValueChange={(v) => v && setRegion(v)} className="flex-wrap gap-1.5">
+        <ToggleGroup type="single" value={region} onValueChange={(v) => { if (!v) return; setRegion(v); setCountry(regionCountries(v)[0]); }} className="flex-wrap gap-1.5">
           {REGIONS.map(([k, label]) => <ToggleGroupItem key={k} value={k} size="sm" className={pill}>{label}</ToggleGroupItem>)}
+        </ToggleGroup>
+
+        <H>Country</H>
+        <ToggleGroup type="single" value={country} onValueChange={(v) => v && setCountry(v)} className="flex-wrap gap-1.5">
+          {regionCountries(region).map((c) => <ToggleGroupItem key={c} value={c} size="sm" className={pill}>{COUNTRY[c] ?? c}</ToggleGroupItem>)}
         </ToggleGroup>
 
         <H>Airport</H>
