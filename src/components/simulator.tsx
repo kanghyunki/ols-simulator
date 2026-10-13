@@ -30,6 +30,7 @@ export function Simulator() {
   const [hover, setHover] = useState<Hover>(null);
   const [region, setRegion] = useState("OCE");
   const [country, setCountry] = useState("PNG");
+  const [sel, setSel] = useState<Set<string>>(new Set());   // runway ends picked for extension (while still at 0 m)
   const [fs, setFs] = useState(false);
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export function Simulator() {
   }, []);
 
   const st = snap?.state, ap = snap?.ap;
+  useEffect(() => { setSel(new Set()); }, [snap?.apId]);
   const set = (p: Record<string, unknown>) => eng.current?.set(p);
   const surf = new Set<string>(st?.surf ?? ALL_KEYS);
   const surfaces = st?.ofz ? [...SURFACES, ...OFZ_SURFACES] : SURFACES;
@@ -93,18 +95,33 @@ export function Simulator() {
         {snap?.failed && <Note>Could not load the airport data (network).</Note>}
         {ap && <Note>{ap.sub} · AD {ap.E} m AMSL · Annex 14 code {ap.code} · terrain {ap.dem === "ok" ? "loaded" : ap.dem === "loading" ? "loading…" : ap.dem === "failed" ? "unavailable" : "none"}</Note>}
 
-        {ap?.ext && st && (
+        {ap && st && (
           <>
             <H>Scenario</H>
-            <ToggleGroup type="single" value={st.scen} onValueChange={(v) => v && set({ scen: v })} className="flex-wrap gap-1.5">
-              <ToggleGroupItem value="ex" size="sm" className={pill}>Existing {ap.rwys[st.extRi].len} m</ToggleGroupItem>
-              <ToggleGroupItem value="ext" size="sm" className={pill}>Extended {ap.rwys[st.extRi].len + st.ext} m</ToggleGroupItem>
-              <ToggleGroupItem value="cmp" size="sm" className={pill}>Compare</ToggleGroupItem>
-            </ToggleGroup>
-            <label className="mt-2 flex items-center gap-2 text-[11px] text-white/60">
-              Extension <input type="range" min={0} max={ap.ext.max ?? 1000} step={10} value={st.ext} onChange={(e) => set({ ext: +e.target.value })} className="w-28 accent-white" />
-              <span className="font-mono text-white/80">{st.ext} m</span>
-            </label>
+            {ap.rwys.map((r: any, i: number) => {
+              const total = r.len + (st.extA[i] || 0) + (st.extB[i] || 0);
+              return (
+                <div key={r.id} className="mb-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="w-[92px] text-[11px] text-white/45">RWY {r.id}</span>
+                    {(["A", "B"] as const).map((end) => { const key = `${i}${end}`, len = (end === "A" ? st.extA : st.extB)[i] || 0, on = len > 0 || sel.has(key);
+                      return <Toggle key={end} size="sm" className={pill} pressed={on} onPressedChange={(v) => { const n = new Set(sel); if (v) n.add(key); else { n.delete(key); eng.current?.setExt(i, end, 0); } setSel(n); }}>
+                        {end === "A" ? r.nameA : r.nameB}{len > 0 && <span className="font-mono text-[10px] text-white/55">+{len}</span>}
+                      </Toggle>; })}
+                    {total !== r.len && <span className="font-mono text-[10.5px] text-white/55">{r.len} → {total} m</span>}
+                  </div>
+                  {(["A", "B"] as const).filter((end) => sel.has(`${i}${end}`) || ((end === "A" ? st.extA : st.extB)[i] || 0) > 0).map((end) => { const len = (end === "A" ? st.extA : st.extB)[i] || 0;
+                    return <label key={end} className="mt-1.5 flex items-center gap-2 pl-[92px] text-[11px] text-white/60">
+                      <span className="w-7">{end === "A" ? r.nameA : r.nameB}</span>
+                      <input type="range" min={0} max={2000} step={50} value={len} onChange={(e) => eng.current?.setExt(i, end, +e.target.value)} className="w-28 accent-white" />
+                      <span className="font-mono whitespace-nowrap text-white/80">+{len} m</span>
+                    </label>; })}
+                </div>
+              ); })}
+            {st.scen !== "ex" && (
+              <Toggle size="sm" className={pill} pressed={!!st.showEx} onPressedChange={(v) => set({ showEx: v })}><span className="size-1.5 rounded-full bg-[#cc785c]" />Existing</Toggle>
+            )}
+            <Note>Click a runway end to extend it; both ends can be extended at once. The new threshold is assumed at the existing end&apos;s elevation. &ldquo;Existing&rdquo; overlays the existing OLS (orange) for comparison.</Note>
           </>
         )}
 

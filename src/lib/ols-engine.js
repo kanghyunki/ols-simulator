@@ -44,23 +44,26 @@ const TAG = { communications_tower: 'Communications tower', mast: 'Mast', tower:
 export function createEngine(canvas, cb) {
   // ---------- state ----------
   let AP = null, APID = null;
-  const state = { scen: 'ex', ext: 750, extRi: 0, extEnd: 'B', E: 39, base: 'sat', pen: true, obs: true, ofz: false, bldH: 6,
+  // extA/extB: extension (m) per runway at the A / B end; showEx overlays the existing OLS for comparison
+  const state = { showEx: false, extA: [], extB: [], E: 39, base: 'sat', pen: true, obs: true, ofz: false, bldH: 6,
     surf: new Set(ALL_KEYS), rot: true, zex: 2 };   // zex: vertical exaggeration, 2× by default so relief reads at 1:1-ish views
 
   // ---------- coordinates / geometry core (per-runway frames) ----------
   function initAp(ap) { if (!ap._k) { const lat0 = ap.osm.origin[0]; ap._k = [111320 * Math.cos(lat0 * Math.PI / 180), 110574]; }
     if (!ap._on) ap._on = ap.rwys.map(() => true); }
   function LL(ap, ll) { const [kx, ky] = ap._k, [lat0, lon0] = ap.osm.origin; return [(ll[1] - lon0) * kx, (ll[0] - lat0) * ky]; }
-  function frames(ext) {
+  // Effective scenario: nothing extended → 'ex'; extended → 'ext', or 'cmp' when the existing OLS is overlaid
+  const anyExt = () => state.extA.some(v => v > 0) || state.extB.some(v => v > 0);
+  const scen = () => !anyExt() ? 'ex' : state.showEx ? 'cmp' : 'ext';
+  function frames(apply) {
     return AP.rwys.map((r, i) => {
       const A = LL(AP, r.llA), B = LL(AP, r.llB);
       const dx = B[0] - A[0], dy = B[1] - A[1], Lb = Math.hypot(dx, dy);
       const U = [dx / Lb, dy / Lb];
       let a = A.slice(), b = B.slice();
-      if (ext > 0 && i === state.extRi) {
-        if (state.extEnd === 'A') a = [A[0] - U[0] * ext, A[1] - U[1] * ext];
-        else b = [B[0] + U[0] * ext, B[1] + U[1] * ext];
-      }
+      if (apply) { const ea = state.extA[i] || 0, eb = state.extB[i] || 0;
+        if (ea > 0) a = [A[0] - U[0] * ea, A[1] - U[1] * ea];
+        if (eb > 0) b = [B[0] + U[0] * eb, B[1] + U[1] * eb]; }
       return { A: a, B: b, L: Math.hypot(b[0] - a[0], b[1] - a[1]), U, N: [-U[1], U[0]],
         eA: r.eA, eB: r.eB, cwyA: r.cwyA, cwyB: r.cwyB, nameA: r.nameA, nameB: r.nameB,
         on: AP._on[i], baseA: A, baseB: B, baseL: Lb, i };
@@ -181,9 +184,9 @@ export function createEngine(canvas, cb) {
 
   // Terrain penetration colour [r,g,b,alpha] or null
   function penColor(P, z, rwsEx, rwsExt) {
-    if (state.scen === 'cmp') { const a = ols(P, rwsEx), b = ols(P, rwsExt); const pa = a ? z - a.h : 0, pb = b ? z - b.h : 0;
+    if (scen() === 'cmp') { const a = ols(P, rwsEx), b = ols(P, rwsExt); const pa = a ? z - a.h : 0, pb = b ? z - b.h : 0;
       if (pa > 0 && pb > 0) return [178, 60, 60, .5]; if (pb > 0) return [123, 31, 162, .6]; if (pa > 0) return [63, 143, 82, .5]; return null; }
-    const r = ols(P, state.scen === 'ex' ? rwsEx : rwsExt); if (!r) return null; const p = z - r.h; if (p <= 0) return null;
+    const r = ols(P, scen() === 'ex' ? rwsEx : rwsExt); if (!r) return null; const p = z - r.h; if (p <= 0) return null;
     const c = rampG(p / 80, P_ST); return [c[0], c[1], c[2], .45 + Math.min(.3, p / 150)]; }
   const bH = b => b.h ? b.h : (b.t ? 0 : state.bldH);
   const bTag = b => (b.t ? TAG[b.t] || b.t : 'Building') + ((b.est || !b.h) ? ' (assumed height)' : '');
@@ -209,8 +212,8 @@ export function createEngine(canvas, cb) {
       loadOsm(id).then(() => { if (APID === id) switchAirport(id); }, () => { if (APID === id) { ap._failed = true; emit(); } });
       return; }
     AP = ap; initAp(AP); state.E = AP.E;
-    if (AP.ext) { state.extRi = AP.ext.ri; state.extEnd = AP.ext.end; state.ext = AP.ext.len; }
-    else { state.extRi = 0; state.extEnd = 'B'; state.ext = 0; state.scen = 'ex'; }
+    state.extA = AP.rwys.map(() => 0); state.extB = AP.rwys.map(() => 0); state.showEx = false;
+    if (AP.ext) (AP.ext.end === 'A' ? state.extA : state.extB)[AP.ext.ri] = AP.ext.len;   // registry preset (PMIA 32R +750 m)
     if (!AP.dem) { if (AP.demFile) loadFileTerrain(); else loadOnlineTerrain(); }
     K.s = K.o = K.g = K.t = K.b = null; sync(); fit('all'); emit();
   }
@@ -218,9 +221,9 @@ export function createEngine(canvas, cb) {
     const ap = APID && AIRPORTS[APID];
     return { apId: APID, loading: !!ap && !ap.osm && !ap._failed, failed: !!ap && !!ap._failed,
       ap: AP ? { name: AP.name, sub: AP.sub, E: AP.E, code: AP.code || 4, origin: AP.osm.origin, ext: AP.ext || null, assume: AP.assume,
-        rwys: AP.rwys.map((r, i) => ({ id: r.id, len: r.len, on: AP._on[i] })),
+        rwys: AP.rwys.map((r, i) => ({ id: r.id, len: r.len, on: AP._on[i], nameA: r.nameA, nameB: r.nameB })),
         dem: AP.dem ? 'ok' : AP._demLoading ? 'loading' : AP._demFailed ? 'failed' : 'none', demSrc: AP.dem && AP.dem.src } : null,
-      state: { ...state, surf: [...state.surf] } };
+      state: { ...state, surf: [...state.surf], extA: [...state.extA], extB: [...state.extB], scen: scen() } };
   }
   const emit = () => cb.onStatus && cb.onStatus(snapshot());
 
@@ -288,7 +291,7 @@ export function createEngine(canvas, cb) {
 
   function buildSurfaces(rwsEx, rwsExt) {
     clear(L.surf); clear(L.grid);
-    const sets = state.scen === 'cmp' ? [[rwsEx, null], [rwsExt, 0xcc785c]] : [[state.scen === 'ex' ? rwsEx : rwsExt, null]];
+    const sets = scen() === 'cmp' ? [[rwsEx, null], [rwsExt, 0xcc785c]] : [[scen() === 'ex' ? rwsEx : rwsExt, null]];
     for (const [rws, uni] of sets) {
       const ex = extent(rws), step = 80, { nx, ny, H } = sampleGrid(ex, step, rws);
       const lineMat = () => new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .16, depthWrite: false });
@@ -304,7 +307,7 @@ export function createEngine(canvas, cb) {
     if (L.ground) { G.remove(L.ground); L.ground.geometry.dispose(); }
     const D = AP.dem; let ex, nx, ny;
     if (D) { ex = { x1: D.x0, x2: D.x0 + (D.nx - 1.01) * D.dx, y1: D.y0, y2: D.y0 + (D.ny - 1.01) * D.dy }; const k = Math.max(1, Math.ceil(Math.max(D.nx, D.ny) / 640)); nx = Math.floor(D.nx / k); ny = Math.floor(D.ny / k); }
-    else { ex = extent(frames(0)); nx = ny = 2; }
+    else { ex = extent(frames(false)); nx = ny = 2; }
     const g = new THREE.PlaneGeometry(1, 1, nx - 1, ny - 1), p = g.attributes.position;   // row 0 = north (y2), matching the texture top
     for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const x = ex.x1 + (ex.x2 - ex.x1) * i / (nx - 1), y = ex.y2 - (ex.y2 - ex.y1) * j / (ny - 1);
       const z = D ? Math.max(0, demAt(x, y) ?? 0) : state.E; p.setXYZ(j * nx + i, x, z, -y); }
@@ -362,13 +365,13 @@ export function createEngine(canvas, cb) {
         const z = eA + (eB - eA) * t, g0 = demAt(x, y); p.setXYZ(j * (n + 1) + i, x, Math.max(z, g0 ?? z) + 1.5, -y); }
       const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide })); G.add(m); L.rwy.push(m); };
     rwsEx.forEach((rw, i) => { const rwE = rwsExt[i];
-      if (state.scen !== 'ex' && state.ext > 0 && i === state.extRi) strip(rwE.A, rwE.B, rwE.eA, rwE.eB, 0xe8a55a);
+      if (scen() !== 'ex') { if (state.extA[i] > 0) strip(rwE.A, rw.baseA, rw.eA, rw.eA, 0xe8a55a); if (state.extB[i] > 0) strip(rw.baseB, rwE.B, rw.eB, rw.eB, 0xe8a55a); }
       strip(rw.baseA, rw.baseB, rw.eA, rw.eB, rw.on ? 0xe8e4dc : 0x6b675f); }); }
 
   function sync() { if (!alive || !AP) return;
-    const rwsEx = frames(0), rwsExt = frames(state.ext), rws = state.scen === 'ext' ? rwsExt : rwsEx;
+    const rwsEx = frames(false), rwsExt = frames(true), rws = scen() === 'ext' ? rwsExt : rwsEx;
     const kG = APID + '|' + (AP.dem ? 1 : 0); if (K.g !== kG) { K.g = kG; buildGround(); K.t = null; }
-    const k0 = [APID, state.scen, state.ext, state.extRi, state.extEnd, state.E, state.ofz ? 1 : 0, AP._on.join('')].join('|');
+    const k0 = [APID, scen(), state.extA.join(','), state.extB.join(','), state.E, state.ofz ? 1 : 0, AP._on.join('')].join('|');
     const kS = k0 + '|' + [...state.surf].sort().join(',');
     if (K.s !== kS) { K.s = kS; buildSurfaces(rwsEx, rwsExt); }
     if (K.r !== k0) { K.r = k0; buildRunways(rwsEx, rwsExt); }
@@ -377,7 +380,7 @@ export function createEngine(canvas, cb) {
     if (K.t !== kT) { K.t = kT; buildOverlay(rwsEx, rwsExt); K.b = null; }
     if (K.b !== kB || texPending) { K.b = kB; buildBase(); } }
   function scheduleSync() { if (syncQueued) return; syncQueued = true; requestAnimationFrame(() => { syncQueued = false; sync(); }); }
-  function fit(kind) { if (!AP) return; const r = kind === 'rwy' ? AP.fitRwy : AP.fitAll, ax = frames(0)[state.extRi], c = Wp(ax, ax.L / 2, 0);
+  function fit(kind) { if (!AP) return; const r = kind === 'rwy' ? AP.fitRwy : AP.fitAll, ax = frames(false)[0], c = Wp(ax, ax.L / 2, 0);
     ctl.target.set(c[0], state.E * G.scale.y, -c[1]); camera.position.set(c[0] - r * .9, r * .8, -c[1] + r * .9); ctl.update(); }
   function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
   function loop() { if (!alive) return; ctl.update(); renderer.render(scene, camera); requestAnimationFrame(loop); }
@@ -389,7 +392,7 @@ export function createEngine(canvas, cb) {
   function hoverInfo(h) {
     if (h.object === L.obs) { const o = L.obsList[L.obs.geometry.attributes.bid.getX(h.face.a)];
       return { kind: 'obstacle', name: o.b.n || null, tag: bTag(o.b), h: o.h, g: o.g, top: o.top, limit: o.r ? { h: o.r.h, name: o.r.name } : null, pen: o.pen }; }
-    const P = [h.point.x, -h.point.z], rwsEx = frames(0), rwsExt = frames(state.ext), ax = rwsEx[state.extRi];
+    const P = [h.point.x, -h.point.z], rwsEx = frames(false), rwsExt = frames(true), ax = rwsEx[0];
     const a = ols(P, rwsEx), b = ols(P, rwsExt), [s, d] = sd(P, ax), g = demAt(P[0], P[1]);
     return { kind: 'point', s, d, ground: g, ex: a, ext: b, refA: ax.nameA }; }
   const onMove = e => { if (!AP || !cb.onHover) return; const h = pick(e); cb.onHover(h ? hoverInfo(h) : null); };
@@ -397,13 +400,14 @@ export function createEngine(canvas, cb) {
 
   // ---------- public API ----------
   function set(patch) {
-    for (const [k, v] of Object.entries(patch)) { if (k === 'surf') state.surf = new Set(v); else state[k] = v; }
+    for (const [k, v] of Object.entries(patch)) { if (k === 'surf') state.surf = new Set(v); else if (k === 'extA' || k === 'extB') state[k] = [...v]; else state[k] = v; }
     if ('rot' in patch) ctl.autoRotate = !!patch.rot;
     if ('zex' in patch) { G.scale.y = +patch.zex; ctl.target.y = state.E * G.scale.y; }
     sync(); emit(); }
+  function setExt(i, end, len) { if (!AP) return; (end === 'A' ? state.extA : state.extB)[i] = Math.max(0, +len || 0); sync(); emit(); }
   function setRunway(i, on) { if (!AP) return; AP._on[i] = on; sync(); emit(); }
   function destroy() { alive = false; canvas.removeEventListener('pointermove', onMove); ctl.dispose(); renderer.dispose(); }
 
   resize(); loop();
-  return { switchAirport, set, setRunway, fit, resize, destroy, snapshot };
+  return { switchAirport, set, setExt, setRunway, fit, resize, destroy, snapshot };
 }
