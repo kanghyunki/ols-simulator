@@ -45,7 +45,7 @@ export function createEngine(canvas, cb) {
   // ---------- state ----------
   let AP = null, APID = null;
   const state = { scen: 'ex', ext: 750, extRi: 0, extEnd: 'B', E: 39, base: 'sat', pen: true, obs: true, ofz: false, bldH: 6,
-    surf: new Set(ALL_KEYS), rot: true, zex: 1 };
+    surf: new Set(ALL_KEYS), rot: true, zex: 2 };   // zex: vertical exaggeration, 2× by default so relief reads at 1:1-ish views
 
   // ---------- coordinates / geometry core (per-runway frames) ----------
   function initAp(ap) { if (!ap._k) { const lat0 = ap.osm.origin[0]; ap._k = [111320 * Math.cos(lat0 * Math.PI / 180), 110574]; }
@@ -223,13 +223,13 @@ export function createEngine(canvas, cb) {
   const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0b0d10);
   const camera = new THREE.PerspectiveCamera(50, 1, 20, 150000);
   const ctl = new OrbitControls(camera, canvas); ctl.enableDamping = true; ctl.autoRotate = true; ctl.autoRotateSpeed = 0.5; ctl.maxPolarAngle = Math.PI / 2 - 0.03;
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x2a2d33, 1.1));
-  const sun = new THREE.DirectionalLight(0xffffff, 0.7); sun.position.set(0.5, 1, 0.6); scene.add(sun);
-  const G = new THREE.Group(); scene.add(G);          // metres. ENU (x,y,z) → three (x, z, -y). G.scale.y = vertical exaggeration
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x2a2d33, 0.75));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.1); sun.position.set(-1, 0.6, -1); scene.add(sun);   // low sun from the north-west, like a hillshade
+  const G = new THREE.Group(); G.scale.y = state.zex; scene.add(G);          // metres. ENU (x,y,z) → three (x, z, -y). G.scale.y = vertical exaggeration
   const L = { ground: null, groundEx: null, surf: [], grid: [], obs: null, obsList: [], rwy: [] };
   const K = {};
   let alive = true, texPending = false, syncQueued = false;
-  const texCv = document.createElement('canvas'), ovCv = document.createElement('canvas');
+  const texCv = document.createElement('canvas'), ovCv = document.createElement('canvas'), hsCv = document.createElement('canvas');
   const tex = new THREE.CanvasTexture(texCv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
 
   function clear(list) { list.forEach(m => { G.remove(m); m.geometry.dispose(); }); list.length = 0; }
@@ -268,13 +268,24 @@ export function createEngine(canvas, cb) {
   function buildGround() {
     if (L.ground) { G.remove(L.ground); L.ground.geometry.dispose(); }
     const D = AP.dem; let ex, nx, ny;
-    if (D) { ex = { x1: D.x0, x2: D.x0 + (D.nx - 1.01) * D.dx, y1: D.y0, y2: D.y0 + (D.ny - 1.01) * D.dy }; const k = Math.max(1, Math.ceil(Math.max(D.nx, D.ny) / 320)); nx = Math.floor(D.nx / k); ny = Math.floor(D.ny / k); }
+    if (D) { ex = { x1: D.x0, x2: D.x0 + (D.nx - 1.01) * D.dx, y1: D.y0, y2: D.y0 + (D.ny - 1.01) * D.dy }; const k = Math.max(1, Math.ceil(Math.max(D.nx, D.ny) / 640)); nx = Math.floor(D.nx / k); ny = Math.floor(D.ny / k); }
     else { ex = extent(frames(0)); nx = ny = 2; }
     const g = new THREE.PlaneGeometry(1, 1, nx - 1, ny - 1), p = g.attributes.position;   // row 0 = north (y2), matching the texture top
     for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const x = ex.x1 + (ex.x2 - ex.x1) * i / (nx - 1), y = ex.y2 - (ex.y2 - ex.y1) * j / (ny - 1);
       const z = D ? Math.max(0, demAt(x, y) ?? 0) : state.E; p.setXYZ(j * nx + i, x, z, -y); }
     g.computeVertexNormals();
-    L.ground = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: tex })); L.groundEx = ex; G.add(L.ground); }
+    L.ground = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: tex })); L.groundEx = ex; G.add(L.ground); buildHillshade(); }
+  // Hillshade from the DEM (sun NW, 40° up, relief ×2), multiplied into the ground texture so slopes read even at 1×.
+  function buildHillshade() { const D = AP.dem, ex = L.groundEx; hsCv.width = hsCv.height = 0; if (!D) return;
+    const W = 1024, H = Math.max(64, Math.round(W * (ex.y2 - ex.y1) / (ex.x2 - ex.x1))); hsCv.width = W; hsCv.height = H;
+    const c = hsCv.getContext('2d'), img = c.createImageData(W, H), d = img.data, sx = (ex.x2 - ex.x1) / W, sy = (ex.y2 - ex.y1) / H, zf = 2;
+    const az = 315 * Math.PI / 180, alt = 40 * Math.PI / 180, lx = Math.cos(alt) * Math.sin(az), ly = Math.cos(alt) * Math.cos(az), lz = Math.sin(alt);
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const x = ex.x1 + (i + .5) * sx, y = ex.y2 - (j + .5) * sy, k = (j * W + i) * 4;
+      const zl = demAt(x - sx, y), zr = demAt(x + sx, y), zu = demAt(x, y + sy), zd = demAt(x, y - sy); let b = 1;
+      if (zl !== null && zr !== null && zu !== null && zd !== null) { const nx = -(zr - zl) / (2 * sx) * zf, ny = -(zu - zd) / (2 * sy) * zf, nl = Math.hypot(nx, ny, 1);
+        b = Math.min(1, 0.45 + 0.75 * Math.max(0, (nx * lx + ny * ly + lz) / nl)); }
+      d[k] = d[k + 1] = d[k + 2] = b * 255; d[k + 3] = 255; }
+    c.putImageData(img, 0, 0); }
   function buildOverlay(rwsEx, rwsExt) { const ex = L.groundEx, W = 640, H = Math.max(64, Math.round(W * (ex.y2 - ex.y1) / (ex.x2 - ex.x1)));
     ovCv.width = W; ovCv.height = H; const oc = ovCv.getContext('2d'), img = oc.createImageData(W, H), d = img.data;
     if (state.pen && AP.dem) for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
@@ -289,7 +300,8 @@ export function createEngine(canvas, cb) {
       for (let tx = tx0; tx <= tx1; tx++) for (let ty = ty0; ty <= ty1; ty++) { const img = tileGet(state.base, z, tx, ty); if (!img) { texPending = true; continue; }
         const xa = (tx2lon(tx, z) - lo0) * kx, xb = (tx2lon(tx + 1, z) - lo0) * kx, yt = (ty2lat(ty, z) - la0) * ky, yb = (ty2lat(ty + 1, z) - la0) * ky;
         tc.drawImage(img, (xa - ex.x1) / mpp, (ex.y2 - yt) / mpp, (xb - xa) / mpp, (yt - yb) / mpp); }
-      tc.fillStyle = 'rgba(8,10,14,.45)'; tc.fillRect(0, 0, W, H); }
+      tc.fillStyle = 'rgba(8,10,14,.3)'; tc.fillRect(0, 0, W, H); }
+    if (hsCv.width) { tc.globalCompositeOperation = 'multiply'; tc.drawImage(hsCv, 0, 0, W, H); tc.globalCompositeOperation = 'source-over'; }
     tc.drawImage(ovCv, 0, 0, W, H); tex.needsUpdate = true; }
   function buildObstacles(rws) {
     if (L.obs) { G.remove(L.obs); L.obs.geometry.dispose(); L.obs = null; } L.obsList = [];
