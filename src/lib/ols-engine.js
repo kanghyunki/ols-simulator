@@ -76,11 +76,15 @@ export function createEngine(canvas, cb) {
   // Approach / take-off / OFZ use the threshold elevation of their end, strip & transitional the centreline
   // elevation (interpolated between thresholds), inner horizontal & conical the aerodrome elevation.
   function olsR(P, rw, allow) {
+    let h = Infinity, name = null, key = null;
+    olsCand(P, rw, (hh, n, k) => { if (allow && !allow.has(k)) return; if (hh < h) { h = hh; name = n; key = k; } });
+    return h === Infinity ? null : { h, name, key };
+  }
+  // Every surface of one runway at P: c(height, name, key) per candidate
+  function olsCand(P, rw, c) {
     const p = olsP();
     const [s, dd] = sd(P, rw), d = Math.abs(dd), E = state.E, L = rw.L, IH = E + 45;
     const Ecl = rw.eA + (rw.eB - rw.eA) * Math.max(0, Math.min(1, s / L));
-    let h = Infinity, name = null, key = null;
-    const c = (hh, n, k) => { if (allow && !allow.has(k)) return; if (hh < h) { h = hh; name = n; key = k; } };
     if (s >= -60 && s <= L + 60 && d <= p.strip) c(Ecl, 'Runway strip', 'strip');
     const ends = [{ u: -60 - s, ap: rw.nameA, to: rw.nameB, Et: rw.eA, cwy: rw.cwyA },
                   { u: s - (L + 60), ap: rw.nameB, to: rw.nameA, Et: rw.eB, cwy: rw.cwyB }];
@@ -103,8 +107,11 @@ export function createEngine(canvas, cb) {
     const S1 = Wp(rw, -60, 0), S2 = Wp(rw, L + 60, 0);
     const r = distSeg(P[0], P[1], S1[0], S1[1], S2[0], S2[1]);
     if (r <= p.ihR) c(IH, 'Inner horizontal', 'ih'); else if (r <= p.ihR + p.con / 0.05) c(IH + 0.05 * (r - p.ihR), 'Conical', 'conical');
-    return h === Infinity ? null : { h, name, key };
   }
+  // Each surface on its own (min over the included runways): { key: height } — for drawing full surfaces, not just the governing one
+  function olsAll(P, rws) { const o = {};
+    for (const rw of rws) { if (!rw.on) continue; olsCand(P, rw, (hh, n, k) => { if (!(k in o) || hh < o[k]) o[k] = hh; }); }
+    return o; }
   // Combined OLS = minimum over the included runways
   function ols(P, rws, allow) { let best = null;
     for (const rw of rws) { if (!rw.on) continue; const r = olsR(P, rw, allow); if (r && (!best || r.h < best.h)) best = r; }
@@ -238,33 +245,61 @@ export function createEngine(canvas, cb) {
       for (const s of [-15660, rw.L + 15660]) for (const d of [-6300, 6300]) { const P = Wp(rw, s, d);
         x1 = Math.min(x1, P[0]); x2 = Math.max(x2, P[0]); y1 = Math.min(y1, P[1]); y2 = Math.max(y2, P[1]); } });
     return any ? { x1, x2, y1, y2 } : { x1: -6000, x2: 6000, y1: -6000, y2: 6000 }; }
-  // height field: fn(P) → {h,c} or null; triangles only where all 4 corners exist (holes outside the OLS)
-  function heightField(ex, step, fn) {
-    const nx = Math.floor((ex.x2 - ex.x1) / step) + 1, ny = Math.floor((ex.y2 - ex.y1) / step) + 1;
-    const pos = new Float32Array(nx * ny * 3), col = new Float32Array(nx * ny * 3), ok = new Uint8Array(nx * ny), tmp = new THREE.Color();
-    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i, x = ex.x1 + i * step, y = ex.y1 + j * step, r = fn([x, y]); if (!r) continue;
-      ok[k] = 1; pos[3 * k] = x; pos[3 * k + 1] = r.h; pos[3 * k + 2] = -y; tmp.setHex(r.c); col[3 * k] = tmp.r; col[3 * k + 1] = tmp.g; col[3 * k + 2] = tmp.b; }
-    const idx = []; for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) { const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1; if (ok[a] && ok[b] && ok[c] && ok[d]) idx.push(a, c, b, b, c, d); }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    g.setIndex(idx); g.computeVertexNormals(); return g; }
-  function gridLines(ex, step, fn) {
-    const nx = Math.floor((ex.x2 - ex.x1) / step) + 1, ny = Math.floor((ex.y2 - ex.y1) / step) + 1, H = new Array(nx * ny), v = [];
-    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const r = fn([ex.x1 + i * step, ex.y1 + j * step]); H[j * nx + i] = r ? r.h : null; }
-    const seg = (i1, j1, i2, j2) => { const a = H[j1 * nx + i1], b = H[j2 * nx + i2]; if (a === null || b === null) return;
+  // One grid pass → per-surface height arrays (NaN where the surface does not exist), then a mesh per surface.
+  // Surfaces are drawn whole, so the approach and take-off climb rise through the inner horizontal and conical.
+  function sampleGrid(ex, step, rws) {
+    const nx = Math.floor((ex.x2 - ex.x1) / step) + 1, ny = Math.floor((ex.y2 - ex.y1) / step) + 1, H = {};
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const all = olsAll([ex.x1 + i * step, ex.y1 + j * step], rws);
+      for (const k in all) (H[k] || (H[k] = new Float32Array(nx * ny).fill(NaN)))[j * nx + i] = all[k]; }
+    return { nx, ny, H }; }
+  function meshFrom(ex, step, nx, ny, h, color) {
+    const pos = new Float32Array(nx * ny * 3);
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; pos[3 * k] = ex.x1 + i * step; pos[3 * k + 1] = isNaN(h[k]) ? 0 : h[k]; pos[3 * k + 2] = -(ex.y1 + j * step); }
+    const idx = []; for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) { const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
+      if (!isNaN(h[a]) && !isNaN(h[b]) && !isNaN(h[c]) && !isNaN(h[d])) idx.push(a, c, b, b, c, d); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+    return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, transparent: true, opacity: .5, side: THREE.DoubleSide, depthWrite: false })); }
+  function linesFrom(ex, step, nx, ny, h, stride) {
+    const v = [], at = (i, j) => h[j * nx + i];
+    const seg = (i1, j1, i2, j2) => { const a = at(i1, j1), b = at(i2, j2); if (isNaN(a) || isNaN(b)) return;
       v.push(ex.x1 + i1 * step, a, -(ex.y1 + j1 * step), ex.x1 + i2 * step, b, -(ex.y1 + j2 * step)); };
-    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { if (i < nx - 1) seg(i, j, i + 1, j); if (j < ny - 1) seg(i, j, i, j + 1); }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); return g; }
+    for (let j = 0; j < ny; j += stride) for (let i = 0; i < nx; i += stride) { if (i + stride < nx) seg(i, j, i + stride, j); if (j + stride < ny) seg(i, j, i, j + stride); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+    return new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .16, depthWrite: false })); }
+
+  // Transitional surfaces are planar ribbons: along the strip edge (inner d = dIn at the centreline elevation) and along
+  // each approach edge (inner d = dIn + div·u at the approach height), rising at `slope` until they meet the inner horizontal.
+  // Built analytically (two quads per side per piece), so their edges are exact lines rather than grid steps.
+  function transGeom(rws, dIn, slope, uMax, div) {
+    const V = [], E = [], IH = state.E + 45;
+    const quad = (rw, a, b, c, d) => { const q = [a, b, c, d].map(([s, dd, h]) => { const P = Wp(rw, s, dd); return [P[0], h, -P[1]]; });
+      V.push(...q[0], ...q[1], ...q[2], ...q[0], ...q[2], ...q[3]); for (let i = 0; i < 4; i++) E.push(...q[i], ...q[(i + 1) % 4]); };
+    for (const rw of rws) { if (!rw.on) continue; const L = rw.L;
+      if (slope === 0) { quad(rw, [-60, -dIn, rw.eA], [L + 60, -dIn, rw.eB], [L + 60, dIn, rw.eB], [-60, dIn, rw.eA]); continue; }   // the strip itself
+      for (const sg of [-1, 1]) {
+        if (IH > rw.eA && IH > rw.eB) quad(rw, [-60, sg * dIn, rw.eA], [L + 60, sg * dIn, rw.eB], [L + 60, sg * (dIn + (IH - rw.eB) / slope), IH], [-60, sg * (dIn + (IH - rw.eA) / slope), IH]);
+        for (const [s0, dir, Et] of [[-60, -1, rw.eA], [L + 60, 1, rw.eB]]) { const u1 = Math.min(uMax, (IH - Et) / 0.02); if (u1 <= 0) continue;
+          const h1 = Et + 0.02 * u1, w1 = dIn + div * u1;
+          quad(rw, [s0, sg * dIn, Et], [s0 + dir * u1, sg * w1, h1], [s0 + dir * u1, sg * (w1 + (IH - h1) / slope), IH], [s0, sg * (dIn + (IH - Et) / slope), IH]); } } }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(V, 3)); g.computeVertexNormals();
+    const e = new THREE.BufferGeometry(); e.setAttribute('position', new THREE.Float32BufferAttribute(E, 3));
+    return [g, e]; }
+  const TRANS = { strip: p => [p.strip, 0, 0, 0], transitional: p => [p.strip, p.trans, p.app1, 0.15], innertrans: () => [60, 0.333, 900, 0] };
 
   function buildSurfaces(rwsEx, rwsExt) {
     clear(L.surf); clear(L.grid);
-    const allow = state.surf;
     const sets = state.scen === 'cmp' ? [[rwsEx, null], [rwsExt, 0xcc785c]] : [[state.scen === 'ex' ? rwsEx : rwsExt, null]];
     for (const [rws, uni] of sets) {
-      const ex = extent(rws), fn = P => { const r = ols(P, rws, allow); return r ? { h: r.h, c: uni ?? COLOR[r.key] } : null; };
-      const m = new THREE.Mesh(heightField(ex, 80, fn), new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: uni ? .35 : .55, side: THREE.DoubleSide, depthWrite: false }));
-      G.add(m); L.surf.push(m);
-      const gl = new THREE.LineSegments(gridLines(ex, 400, fn), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .18, depthWrite: false }));
-      G.add(gl); L.grid.push(gl); } }
+      const ex = extent(rws), step = 80, { nx, ny, H } = sampleGrid(ex, step, rws);
+      const lineMat = () => new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .16, depthWrite: false });
+      for (const k of state.surf) {
+        if (TRANS[k]) { if (k === 'innertrans' && !state.ofz) continue;
+          const [g, e] = transGeom(rws, ...TRANS[k](olsP()));
+          const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: uni ?? COLOR[k], transparent: true, opacity: uni ? .3 : .5, side: THREE.DoubleSide, depthWrite: false }));
+          G.add(m); L.surf.push(m); const gl = new THREE.LineSegments(e, lineMat()); G.add(gl); L.grid.push(gl); continue; }
+        const h = H[k]; if (!h) continue;
+        const m = meshFrom(ex, step, nx, ny, h, uni ?? COLOR[k]); if (uni) m.material.opacity = .3; G.add(m); L.surf.push(m);
+        const gl = linesFrom(ex, step, nx, ny, h, 5); G.add(gl); L.grid.push(gl); } } }
   function buildGround() {
     if (L.ground) { G.remove(L.ground); L.ground.geometry.dispose(); }
     const D = AP.dem; let ex, nx, ny;
