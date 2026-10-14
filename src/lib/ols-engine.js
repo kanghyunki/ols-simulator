@@ -219,7 +219,7 @@ export function createEngine(canvas, cb) {
   }
   function snapshot() {
     const ap = APID && AIRPORTS[APID];
-    return { apId: APID, loading: !!ap && !ap.osm && !ap._failed, failed: !!ap && !!ap._failed,
+    return { apId: APID, loading: !!ap && !ap.osm && !ap._failed, failed: !!ap && !!ap._failed, pending: texPending,
       ap: AP ? { name: AP.name, sub: AP.sub, E: AP.E, code: AP.code || 4, origin: AP.osm.origin, ext: AP.ext || null, assume: AP.assume,
         rwys: AP.rwys.map((r, i) => ({ id: r.id, len: r.len, on: AP._on[i], nameA: r.nameA, nameB: r.nameB })),
         dem: AP.dem ? 'ok' : AP._demLoading ? 'loading' : AP._demFailed ? 'failed' : 'none', demSrc: AP.dem && AP.dem.src } : null,
@@ -240,7 +240,7 @@ export function createEngine(canvas, cb) {
   const K = {};
   let alive = true, texPending = false, syncQueued = false;
   const texCv = document.createElement('canvas'), ovCv = document.createElement('canvas'), hsCv = document.createElement('canvas');
-  const tex = new THREE.CanvasTexture(texCv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  let tex = null;   // CanvasTexture, recreated on every texture rebuild (re-uploading a resized canvas into one texture proved unreliable)
 
   function clear(list) { list.forEach(m => { G.remove(m); m.geometry.dispose(); }); list.length = 0; }
   function extent(rws) { let x1 = 1e9, x2 = -1e9, y1 = 1e9, y2 = -1e9, any = false;
@@ -340,7 +340,9 @@ export function createEngine(canvas, cb) {
         tc.drawImage(img, (xa - ex.x1) / mpp, (ex.y2 - yt) / mpp, (xb - xa) / mpp, (yt - yb) / mpp); }
       tc.fillStyle = 'rgba(8,10,14,.3)'; tc.fillRect(0, 0, W, H); }
     if (hsCv.width) { tc.globalCompositeOperation = 'multiply'; tc.drawImage(hsCv, 0, 0, W, H); tc.globalCompositeOperation = 'source-over'; }
-    tc.drawImage(ovCv, 0, 0, W, H); tex.needsUpdate = true; }
+    tc.drawImage(ovCv, 0, 0, W, H);
+    if (tex) tex.dispose(); tex = new THREE.CanvasTexture(texCv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+    if (L.ground) { L.ground.material.map = tex; L.ground.material.needsUpdate = true; } }
   function buildObstacles(rws) {
     if (L.obs) { G.remove(L.obs); L.obs.geometry.dispose(); L.obs = null; } L.obsList = [];
     if (!state.obs) return;
@@ -404,10 +406,21 @@ export function createEngine(canvas, cb) {
     if ('rot' in patch) ctl.autoRotate = !!patch.rot;
     if ('zex' in patch) { G.scale.y = +patch.zex; ctl.target.y = state.E * G.scale.y; }
     sync(); emit(); }
+  // Summary for reports: terrain above the combined OLS on a 60 m grid (km², max), and the buildings through it
+  function stats() { if (!AP) return null;
+    const rws = frames(true), ex = extent(rws), by = {}; let n = 0, worst = null;
+    for (let x = ex.x1; x <= ex.x2; x += 60) for (let y = ex.y1; y <= ex.y2; y += 60) { const g = demAt(x, y); if (g === null) continue;
+      const r = ols([x, y], rws); if (!r) continue; const pen = g - r.h; if (pen <= 0) continue;
+      const e = by[r.key] || (by[r.key] = { name: r.name.replace(/ RWY .*/, ''), n: 0, max: 0 }); e.n++; e.area = +(e.n * 0.0036).toFixed(2); if (pen > e.max) e.max = +pen.toFixed(1);
+      if (!worst || pen > worst.pen) worst = { pen: +pen.toFixed(1), surface: r.name }; n++; }
+    const bad = L.obsList.filter(o => o.pen > 0).sort((a, b) => b.pen - a.pen)
+      .map(o => ({ name: o.b.n || null, tag: bTag(o.b), h: o.h, top: +o.top.toFixed(1), limit: +o.r.h.toFixed(1), surface: o.r.name, pen: +o.pen.toFixed(1) }));
+    return { apId: APID, dem: AP.dem ? AP.dem.src : null, area: +(n * 0.0036).toFixed(2), worst, bySurface: by, obsChecked: L.obsList.length, obsBad: bad }; }
   function setExt(i, end, len) { if (!AP) return; (end === 'A' ? state.extA : state.extB)[i] = Math.max(0, +len || 0); sync(); emit(); }
   function setRunway(i, on) { if (!AP) return; AP._on[i] = on; sync(); emit(); }
   function destroy() { alive = false; canvas.removeEventListener('pointermove', onMove); ctl.dispose(); renderer.dispose(); }
 
   resize(); loop();
-  return { switchAirport, set, setExt, setRunway, fit, resize, destroy, snapshot };
+  const debug = () => ({ pending: texPending, K: { ...K }, texW: texCv.width, texH: texCv.height, hsW: hsCv.width, tex: texCv.toDataURL('image/jpeg', .5), hs: hsCv.width ? hsCv.toDataURL('image/jpeg', .5) : null });
+  return { switchAirport, set, setExt, setRunway, fit, resize, destroy, snapshot, stats, debug };
 }

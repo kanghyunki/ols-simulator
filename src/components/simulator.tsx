@@ -37,6 +37,7 @@ export function Simulator() {
     const c = canvas.current!;
     const e = createEngine(c, { onStatus: setSnap, onHover: setHover });
     eng.current = e;
+    (window as any).__ols = e;   // console / report hook: __ols.stats()
     const id = (location.hash || "").replace("#", "").toUpperCase();
     const start = (AIRPORTS as any)[id] ? id : "PMIA";
     setRegion((AIRPORTS as any)[start].region); setCountry(countryOf((AIRPORTS as any)[start]));
