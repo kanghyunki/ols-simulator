@@ -32,6 +32,7 @@ export function Simulator() {
   const [country, setCountry] = useState("PNG");
   const [sel, setSel] = useState<Set<string>>(new Set());   // runway ends picked for extension (while still at 0 m)
   const [fs, setFs] = useState(false);
+  const [menu, setMenu] = useState(false);   // mobile only: controls shown as a bottom sheet
 
   useEffect(() => {
     const c = canvas.current!;
@@ -60,16 +61,17 @@ export function Simulator() {
       <canvas ref={canvas} className="absolute inset-0 block h-full w-full cursor-grab active:cursor-grabbing" />
 
       {/* top bar */}
-      <div className="pointer-events-none absolute top-0 right-0 left-0 flex items-center justify-between px-7 py-4 text-[11.5px] text-white/60">
-        <span className="font-mono tracking-wide">{ap ? `${Math.abs(ap.origin[0]).toFixed(4)}°${ap.origin[0] < 0 ? "S" : "N"}  ${Math.abs(ap.origin[1]).toFixed(4)}°${ap.origin[1] < 0 ? "W" : "E"}` : ""}</span>
+      <div className="pointer-events-none absolute top-0 right-0 left-0 flex items-center justify-between px-7 py-4 text-[11.5px] text-white/60 max-md:px-3 max-md:py-2.5">
+        <span className="font-mono tracking-wide max-md:hidden">{ap ? `${Math.abs(ap.origin[0]).toFixed(4)}°${ap.origin[0] < 0 ? "S" : "N"}  ${Math.abs(ap.origin[1]).toFixed(4)}°${ap.origin[1] < 0 ? "W" : "E"}` : ""}</span>
+        <Button size="xs" className={`${pill} pointer-events-auto md:hidden`} onClick={() => setMenu((m) => !m)}>{menu ? "Close" : "Controls"}</Button>
         <span className="flex items-center gap-4">
-          {ap && <span className="text-white/80">{ap.sub}</span>}
+          {ap && <span className="text-white/80 max-md:hidden">{ap.sub}</span>}
           <span className="text-[13px] font-semibold tracking-tight text-white">CADIP-II · OLS Simulator</span>
         </span>
       </div>
 
       {/* left panel */}
-      <div className="absolute top-14 bottom-10 left-7 w-[270px] overflow-y-auto pr-2 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,.15)_transparent]">
+      <div className={`absolute top-14 bottom-10 left-7 w-[270px] overflow-y-auto pr-2 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,.15)_transparent] max-md:inset-x-0 max-md:top-auto max-md:bottom-6 max-md:w-auto max-md:max-h-[50vh] max-md:rounded-t-2xl max-md:bg-[#0b0d10]/90 max-md:px-4 max-md:pt-3 max-md:pb-4 max-md:backdrop-blur ${menu ? "" : "max-md:hidden"}`}>
         <H>View</H>
         <div className="flex flex-wrap gap-1.5">
           <Button size="xs" className={pill} onClick={() => eng.current?.fit("all")}>Overview</Button>
@@ -174,7 +176,7 @@ export function Simulator() {
       </div>
 
       {/* right: altitude read-out */}
-      <div className="pointer-events-none absolute top-14 right-7 w-[230px] text-[11.5px]">
+      <div className="pointer-events-none absolute top-14 right-7 w-[230px] text-[11.5px] max-md:top-12 max-md:right-3 max-md:w-[170px] max-md:text-[10.5px]">
         <div className="text-[13px] font-semibold text-white">Altitude</div>
         {hover?.kind === "obstacle" ? (
           <div className="mt-2 space-y-0.5">
@@ -203,9 +205,9 @@ export function Simulator() {
         </div>
       </div>
 
-      <div className="pointer-events-none absolute right-7 bottom-3 left-7 flex justify-between text-[10.5px] text-white/35">
-        <span>Drag to orbit · scroll to zoom · right-drag to pan · hover a building for its clearance</span>
-        <span>Terrain GEDTM30 © OpenGeoHub (CC BY 4.0) · Buildings © OpenStreetMap contributors · Imagery © Esri</span>
+      <div className="pointer-events-none absolute right-7 bottom-3 left-7 flex justify-between text-[10.5px] text-white/35 max-md:inset-x-3 max-md:bottom-1 max-md:text-[9px]">
+        <span className="max-md:hidden">Drag to orbit · scroll to zoom · right-drag to pan · hover a building for its clearance</span>
+        <span className="truncate">Terrain GEDTM30 © OpenGeoHub (CC BY 4.0) · Buildings © OpenStreetMap contributors · Imagery © Esri</span>
       </div>
     </div>
   );
