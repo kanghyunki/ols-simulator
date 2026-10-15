@@ -121,10 +121,24 @@ export function Simulator() {
                     </label>; })}
                 </div>
               ); })}
+            <div className="mb-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="w-[92px] text-[11px] text-white/45">Parallel</span>
+                {ap.rwys.map((r: any, i: number) => <Button key={r.id} size="xs" className={pill} onClick={() => set({ par: [...st.par, { ri: i, off: 760 }] })}>+ ∥ {r.id}</Button>)}
+              </div>
+              {(st.par as { ri: number; off: number }[]).map((p, k) => { const upd = (off: number) => set({ par: st.par.map((q: any, j: number) => (j === k ? { ...q, off } : q)) });
+                return <label key={k} className="mt-1.5 flex items-center gap-1.5 pl-2 text-[11px] text-white/60">
+                  <span className="w-[68px] truncate">∥ {ap.rwys[p.ri].id}</span>
+                  <input type="range" min={-2000} max={2000} step={10} value={p.off} onChange={(e) => upd(+e.target.value)} className="w-20 accent-white" />
+                  <input type="number" step={10} value={p.off} onChange={(e) => upd(+e.target.value)} className="w-14 rounded border border-white/10 bg-white/10 px-1 py-0.5 font-mono text-white/80" />
+                  <span>m</span>
+                  <button className="text-white/35 hover:text-white/80" title="Remove" onClick={() => set({ par: st.par.filter((_: any, j: number) => j !== k) })}>×</button>
+                </label>; })}
+            </div>
             {st.scen !== "ex" && (
               <Toggle size="sm" className={pill} pressed={!!st.showEx} onPressedChange={(v) => set({ showEx: v })}><span className="size-1.5 rounded-full bg-[#cc785c]" />Existing</Toggle>
             )}
-            <Note>Click a runway end to extend it; both ends can be extended at once. The new threshold is assumed at the existing end&apos;s elevation. &ldquo;Existing&rdquo; overlays the existing OLS (orange) for comparison.</Note>
+            <Note>Click a runway end to extend it; both ends can be extended at once. The new threshold is assumed at the existing end&apos;s elevation. &ldquo;+ ∥&rdquo; adds a parallel runway at the given centreline spacing (negative = the other side), same length and threshold elevations as its reference. &ldquo;Existing&rdquo; overlays the existing OLS (orange) for comparison.</Note>
           </>
         )}
 
