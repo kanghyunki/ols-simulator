@@ -402,6 +402,43 @@ const AIRPORTS={
       +'· CWY: 02L/20R 양단 270m, 02C/20C·02R/20L 60m (AD 2.12/2.13 TODA−TORA). <b>20R 시단 740m 이설</b>은 미반영 — 02L/20R llB는 활주로 기하 말단 좌표라 20R 접근표면 원점이 실제(이설시단+60m)보다 바깥에 놓여 보수측 판정.<br>'
       +'· 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드 — 창이는 해안 매립지로 평탄, 저촉은 주로 서측 내륙 구릉·건물. 건물은 OSM height/levels 태그 중 h≥20m만 수록(1,769동, IH 51.7m 기준 20m 미만은 저촉 불가).<br>'
       +'· 전 활주로 정밀(CAT II/III) → OLS 제원은 Tab.4-1 Code 4, OFZ 옵션(AD 2.12 OFZ 존재 명기).'
+  },
+  FQMA:{
+    name:'마푸토', sub:'FQMA · Maputo Intl · Mozambique', region:'AFR', E:44.8, code:4,
+    osm:null, dem:null,
+    rwys:[ // THR = OSM 활주로 도형 끝점 (AIP 공식 좌표 아님)
+      {id:'05/23', nameA:'05', nameB:'23', len:3660,
+       llA:[-25.9246677, 32.5702304], llB:[-25.8958762, 32.5878288], eA:44.8, eB:44.8, cwyA:60, cwyB:60}
+    ],
+    bgRwy:['10/28'], ext:null, fitAll:13000, fitRwy:4460,
+    assume:'· 시단 좌표는 <b>OSM 활주로 도형 끝점</b>(주축 근사, AIP 공식 좌표 아님). 활주로 05/23 3660×45m (OSM length 태그, 도형 3639m).<br>'
+      +'· 표고: AD 44.8m(OSM ele 태그), 시단 표고는 AD 표고로 <b>가정</b> · CWY 60m 가정 — Mozambique AIP AD 2 FQMA 값으로 교체 권장.<br>'
+      +'· OLS 제원: Annex 14 Tab.4-1 code 4. 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드. 건물: OSM height/levels 태그 보유분만(대부분 가정 높이).<br>'
+      +'· 보조 활주로 10/28(1700m)은 배경 표시만(OLS 미계산).'
+  },
+  FQBR:{
+    name:'베이라', sub:'FQBR · Beira Intl · Mozambique', region:'AFR', E:11.0, code:4,
+    osm:null, dem:null,
+    rwys:[ // THR = OSM 활주로 도형 끝점 (AIP 공식 좌표 아님)
+      {id:'12/30', nameA:'30', nameB:'12', len:2400,
+       llA:[-19.7992518, 34.9187067], llB:[-19.7936971, 34.8967596], eA:11.0, eB:11.0, cwyA:60, cwyB:60}
+    ],
+    bgRwy:[], ext:null, fitAll:11000, fitRwy:3200,
+    assume:'· 시단 좌표는 <b>OSM 활주로 도형 끝점</b>(주축 근사, AIP 공식 좌표 아님). 활주로 12/30 2400×45m (OSM length 태그, 도형 2379m).<br>'
+      +'· 표고: AD 11.0m(OSM ele 태그), 시단 표고는 AD 표고로 <b>가정</b> · CWY 60m 가정 — Mozambique AIP AD 2 FQBR 값으로 교체 권장.<br>'
+      +'· OLS 제원: Annex 14 Tab.4-1 code 4. 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드. 건물: OSM height/levels 태그 보유분만(대부분 가정 높이).'
+  },
+  FQPB:{
+    name:'펨바', sub:'FQPB · Pemba Intl · Mozambique', region:'AFR', E:100.0, code:4,
+    osm:null, dem:null,
+    rwys:[ // THR = OSM 활주로 도형 끝점 (AIP 공식 좌표 아님)
+      {id:'17/35', nameA:'17', nameB:'35', len:1800,
+       llA:[-12.9856508, 40.5220901], llB:[-13.0008476, 40.5275375], eA:100.0, eB:100.0, cwyA:60, cwyB:60}
+    ],
+    bgRwy:[], ext:null, fitAll:9000, fitRwy:2600,
+    assume:'· 시단 좌표는 <b>OSM 활주로 도형 끝점</b>(주축 근사, AIP 공식 좌표 아님). 활주로 17/35 1800×45m (OSM length 태그, 도형 1781m).<br>'
+      +'· 표고: AD 100.0m(OSM ele 태그), 시단 표고는 AD 표고로 <b>가정</b> · CWY 60m 가정 — Mozambique AIP AD 2 FQPB 값으로 교체 권장.<br>'
+      +'· OLS 제원: Annex 14 Tab.4-1 code 4(1800m — code 3/4 경계). 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드. 건물: OSM height/levels 태그 보유분만.'
   }
 };
 if(typeof PNG_AIRPORTS!=='undefined') Object.assign(AIRPORTS,PNG_AIRPORTS);   // CADIP-II PNG 13개 — tools/ols/gen_registry.py 생성
