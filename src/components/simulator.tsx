@@ -31,8 +31,8 @@ export function Simulator({ onHome }: { onHome: () => void }) {
   const eng = useRef<Engine | null>(null);
   const [snap, setSnap] = useState<Snap | null>(null);
   const [hover, setHover] = useState<Hover>(null);
-  const [region, setRegion] = useState("OCE");
-  const [country, setCountry] = useState("PNG");
+  const [region, setRegion] = useState("NEA");
+  const [country, setCountry] = useState("Korea");
   const [sel, setSel] = useState<Set<string>>(new Set());   // runway ends picked for extension (while still at 0 m)
   const [fs, setFs] = useState(false);
   const [menu, setMenu] = useState(false);   // mobile only: controls shown as a bottom sheet
@@ -43,7 +43,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
     eng.current = e;
     (window as any).__ols = e;   // console / report hook: __ols.stats()
     const id = (location.hash || "").replace("#", "").toUpperCase();
-    const start = (AIRPORTS as any)[id] ? id : "PMIA";
+    const start = (AIRPORTS as any)[id] ? id : "ICN";
     setRegion((AIRPORTS as any)[start].region); setCountry(countryOf((AIRPORTS as any)[start]));
     e.switchAirport(start);
     const ro = new ResizeObserver(() => e.resize()); ro.observe(c);
