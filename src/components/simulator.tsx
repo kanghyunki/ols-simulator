@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { createEngine, AIRPORTS, REGIONS, SURFACES as _S, OFZ_SURFACES as _O, ALL_KEYS as _K } from "@/lib/ols-engine.js";
+import { createEngine, AIRPORTS, SURFACES as _S, OFZ_SURFACES as _O, ALL_KEYS as _K } from "@/lib/ols-engine.js";
 type Surf = [string, string, number];
 const SURFACES = _S as unknown as Surf[], OFZ_SURFACES = _O as unknown as Surf[], ALL_KEYS = _K as string[];
 
@@ -17,6 +17,9 @@ const hex = (c: number) => "#" + c.toString(16).padStart(6, "0");
 // Country = last segment of the registry's `sub` ("AYPY · Jacksons Intl · PNG"); long names for the buttons
 const countryOf = (a: any): string => a.sub.split(" · ").pop();
 const COUNTRY: Record<string, string> = { PNG: "Papua New Guinea" };
+// Region buttons in display order (codes match the registry's `region`); regions without airports yet show a note
+const REGIONS = [["NEA", "North-east Asia"], ["SEA", "South-east Asia"], ["EUR", "Europe"], ["MEA", "Middle East"], ["OCE", "Oceania"],
+  ["NAM", "North America"], ["SAM", "South America"], ["AFR", "Africa"]];
 const regionCountries = (region: string) => [...new Set(Object.values(AIRPORTS as Record<string, any>).filter((a) => a.region === region).map(countryOf))].sort();
 
 function H({ children }: { children: React.ReactNode }) { return <div className="mt-5 mb-2 text-[13px] font-semibold text-white first:mt-0">{children}</div>; }
@@ -93,6 +96,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
         <ToggleGroup type="single" value={country} onValueChange={(v) => v && setCountry(v)} className="flex-wrap gap-1.5">
           {regionCountries(region).map((c) => <ToggleGroupItem key={c} value={c} size="sm" className={pill}>{COUNTRY[c] ?? c}</ToggleGroupItem>)}
         </ToggleGroup>
+        {!regionCountries(region).length && <Note>No airports in this region yet.</Note>}
 
         <H>Airport</H>
         <ToggleGroup type="single" value={snap?.apId ?? ""} onValueChange={(v) => v && eng.current?.switchAirport(v)} className="flex-wrap gap-1.5">

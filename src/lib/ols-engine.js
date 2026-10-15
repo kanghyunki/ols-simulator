@@ -7,7 +7,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { AIRPORTS } from '@/data/airports.js';
 import { PROCEDURES } from '@/data/procedures.js';
 
-export { AIRPORTS, REGIONS } from '@/data/airports.js';
+export { AIRPORTS } from '@/data/airports.js';
 
 // Surface keys (for the per-surface toggles) and display colours. OFZ surfaces only exist when state.ofz.
 export const SURFACES = [
