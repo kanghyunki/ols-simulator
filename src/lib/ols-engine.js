@@ -45,7 +45,8 @@ export function createEngine(canvas, cb) {
   // ---------- state ----------
   let AP = null, APID = null;
   // extA/extB: extension (m) per runway at the A / B end; showEx overlays the existing OLS for comparison
-  // par: added parallel runways [{ ri, off }] — a copy of runway `ri` shifted `off` m to its left (A→B), same length and thresholds
+  // par: added parallel runways [{ ri, off, len }] — a copy of runway `ri` shifted `off` m to its left (A→B; negative = right),
+  // centred on the reference, `len` m long (default: the reference length), same threshold elevations
   const state = { showEx: false, extA: [], extB: [], par: [], E: 39, base: 'sat', pen: true, obs: true, ofz: false, bldH: 6,
     surf: new Set(ALL_KEYS), rot: true, zex: 2 };   // zex: vertical exaggeration, 2× by default so relief reads at 1:1-ish views
 
@@ -56,12 +57,13 @@ export function createEngine(canvas, cb) {
   // Effective scenario: nothing extended → 'ex'; extended → 'ext', or 'cmp' when the existing OLS is overlaid
   const anyExt = () => state.extA.some(v => v > 0) || state.extB.some(v => v > 0) || state.par.length > 0;
   const scen = () => !anyExt() ? 'ex' : state.showEx ? 'cmp' : 'ext';
-  const parKey = () => state.par.map(p => p.ri + ':' + p.off).join(',');
+  const parKey = () => state.par.map(p => p.ri + ':' + p.off + ':' + (p.len || 0)).join(',');
   function frames(apply) {
     const base = baseFrames(apply); if (!apply) return base;
     return base.concat(state.par.map((p, k) => { const r = base[p.ri]; if (!r) return null;
-      const A = [r.A[0] + r.N[0] * p.off, r.A[1] + r.N[1] * p.off], B = [r.B[0] + r.N[0] * p.off, r.B[1] + r.N[1] * p.off];
-      return { ...r, A, B, baseA: A, baseB: B, nameA: r.nameA + '′', nameB: r.nameB + '′', par: true, i: base.length + k }; }).filter(Boolean));
+      const L = p.len > 0 ? p.len : r.L, h = L / 2, mx = (r.A[0] + r.B[0]) / 2 + r.N[0] * p.off, my = (r.A[1] + r.B[1]) / 2 + r.N[1] * p.off;
+      const A = [mx - r.U[0] * h, my - r.U[1] * h], B = [mx + r.U[0] * h, my + r.U[1] * h];
+      return { ...r, A, B, L, baseA: A, baseB: B, baseL: L, nameA: r.nameA + '′', nameB: r.nameB + '′', par: true, i: base.length + k }; }).filter(Boolean));
   }
   function baseFrames(apply) {
     return AP.rwys.map((r, i) => {
@@ -381,7 +383,7 @@ export function createEngine(canvas, cb) {
 
   function sync() { if (!alive || !AP) return;
     const rwsEx = frames(false), rwsExt = frames(true), rws = scen() === 'ext' ? rwsExt : rwsEx;
-    const kG = APID + '|' + (AP.dem ? 1 : 0); if (K.g !== kG) { K.g = kG; buildGround(); K.t = null; }
+    const kG = APID + '|' + (AP.dem ? 1 : 0); if (K.g !== kG) { K.g = kG; buildGround(); K.t = null; K.o = null; }   // terrain arrived after the first draw: obstacles' ground heights must be rebuilt too
     const k0 = [APID, scen(), state.extA.join(','), state.extB.join(','), parKey(), state.E, state.ofz ? 1 : 0, AP._on.join('')].join('|');
     const kS = k0 + '|' + [...state.surf].sort().join(',');
     if (K.s !== kS) { K.s = kS; buildSurfaces(rwsEx, rwsExt); }
@@ -412,7 +414,7 @@ export function createEngine(canvas, cb) {
   // ---------- public API ----------
   function set(patch) {
     for (const [k, v] of Object.entries(patch)) { if (k === 'surf') state.surf = new Set(v); else if (k === 'extA' || k === 'extB') state[k] = [...v];
-      else if (k === 'par') state.par = v.map(p => ({ ri: p.ri, off: +p.off || 0 })).filter(p => AP && AP.rwys[p.ri]); else state[k] = v; }
+      else if (k === 'par') state.par = v.map(p => ({ ri: p.ri, off: +p.off || 0, len: Math.max(0, +p.len || 0) })).filter(p => AP && AP.rwys[p.ri]); else state[k] = v; }
     if ('rot' in patch) ctl.autoRotate = !!patch.rot;
     if ('zex' in patch) { G.scale.y = +patch.zex; ctl.target.y = state.E * G.scale.y; }
     sync(); emit(); }

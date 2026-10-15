@@ -124,21 +124,37 @@ export function Simulator() {
             <div className="mb-2">
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="w-[92px] text-[11px] text-white/45">Parallel</span>
-                {ap.rwys.map((r: any, i: number) => <Button key={r.id} size="xs" className={pill} onClick={() => set({ par: [...st.par, { ri: i, off: 760 }] })}>+ ∥ {r.id}</Button>)}
+                {ap.rwys.map((r: any, i: number) => <Button key={r.id} size="xs" className={pill} onClick={() => set({ par: [...st.par, { ri: i, off: 760, len: 0 }] })}>+ ∥ {r.id}</Button>)}
               </div>
-              {(st.par as { ri: number; off: number }[]).map((p, k) => { const upd = (off: number) => set({ par: st.par.map((q: any, j: number) => (j === k ? { ...q, off } : q)) });
-                return <label key={k} className="mt-1.5 flex items-center gap-1.5 pl-2 text-[11px] text-white/60">
-                  <span className="w-[68px] truncate">∥ {ap.rwys[p.ri].id}</span>
-                  <input type="range" min={-2000} max={2000} step={10} value={p.off} onChange={(e) => upd(+e.target.value)} className="w-20 accent-white" />
-                  <input type="number" step={10} value={p.off} onChange={(e) => upd(+e.target.value)} className="w-14 rounded border border-white/10 bg-white/10 px-1 py-0.5 font-mono text-white/80" />
-                  <span>m</span>
-                  <button className="text-white/35 hover:text-white/80" title="Remove" onClick={() => set({ par: st.par.filter((_: any, j: number) => j !== k) })}>×</button>
-                </label>; })}
+              {(st.par as { ri: number; off: number; len: number }[]).map((p, k) => { const upd = (q: Partial<typeof p>) => set({ par: st.par.map((r: any, j: number) => (j === k ? { ...r, ...q } : r)) });
+                const sp = Math.abs(p.off), side = p.off < 0 ? "R" : "L", len = p.len || ap.rwys[p.ri].len;
+                return <div key={k} className="mt-1.5 flex flex-col gap-1 pl-2 text-[11px] text-white/60">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-[68px] truncate">∥ {ap.rwys[p.ri].id}</span>
+                    <ToggleGroup type="single" value={side} onValueChange={(v) => v && upd({ off: (v === "R" ? -1 : 1) * sp })} className="gap-1">
+                      <ToggleGroupItem value="L" size="sm" className={pill} title="Left of the runway (looking from A to B)">Left</ToggleGroupItem>
+                      <ToggleGroupItem value="R" size="sm" className={pill} title="Right of the runway (looking from A to B)">Right</ToggleGroupItem>
+                    </ToggleGroup>
+                    <button className="text-white/35 hover:text-white/80" title="Remove" onClick={() => set({ par: st.par.filter((_: any, j: number) => j !== k) })}>×</button>
+                  </div>
+                  <label className="flex items-center gap-1.5 pl-[72px]">
+                    <span className="w-12">spacing</span>
+                    <input type="range" min={0} max={2000} step={10} value={sp} onChange={(e) => upd({ off: (side === "R" ? -1 : 1) * +e.target.value })} className="w-20 accent-white" />
+                    <input type="number" step={10} min={0} value={sp} onChange={(e) => upd({ off: (side === "R" ? -1 : 1) * Math.abs(+e.target.value) })} className="w-14 rounded border border-white/10 bg-white/10 px-1 py-0.5 font-mono text-white/80" />
+                    <span>m</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 pl-[72px]">
+                    <span className="w-12">length</span>
+                    <input type="range" min={500} max={5000} step={50} value={len} onChange={(e) => upd({ len: +e.target.value })} className="w-20 accent-white" />
+                    <input type="number" step={50} min={500} value={len} onChange={(e) => upd({ len: +e.target.value })} className="w-14 rounded border border-white/10 bg-white/10 px-1 py-0.5 font-mono text-white/80" />
+                    <span>m</span>
+                  </label>
+                </div>; })}
             </div>
             {st.scen !== "ex" && (
               <Toggle size="sm" className={pill} pressed={!!st.showEx} onPressedChange={(v) => set({ showEx: v })}><span className="size-1.5 rounded-full bg-[#cc785c]" />Existing</Toggle>
             )}
-            <Note>Click a runway end to extend it; both ends can be extended at once. The new threshold is assumed at the existing end&apos;s elevation. &ldquo;+ ∥&rdquo; adds a parallel runway at the given centreline spacing (negative = the other side), same length and threshold elevations as its reference. &ldquo;Existing&rdquo; overlays the existing OLS (orange) for comparison.</Note>
+            <Note>Click a runway end to extend it; both ends can be extended at once. The new threshold is assumed at the existing end&apos;s elevation. &ldquo;+ ∥&rdquo; adds a parallel runway, centred on its reference, on the chosen side at the given centreline spacing; its length defaults to the reference runway. Threshold elevations are copied from the reference. &ldquo;Existing&rdquo; overlays the existing OLS (orange) for comparison.</Note>
           </>
         )}
 
