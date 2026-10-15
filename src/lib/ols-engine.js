@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { AIRPORTS } from '@/data/airports.js';
+import { PROCEDURES } from '@/data/procedures.js';
 
 export { AIRPORTS, REGIONS } from '@/data/airports.js';
 
@@ -47,7 +48,7 @@ export function createEngine(canvas, cb) {
   // extA/extB: extension (m) per runway at the A / B end; showEx overlays the existing OLS for comparison
   // par: added parallel runways [{ ri, off, len }] — a copy of runway `ri` shifted `off` m to its left (A→B; negative = right),
   // centred on the reference, `len` m long (default: the reference length), same threshold elevations
-  const state = { showEx: false, extA: [], extB: [], par: [], E: 39, base: 'sat', pen: true, obs: true, ofz: false, bldH: 6,
+  const state = { showEx: false, extA: [], extB: [], par: [], E: 39, base: 'sat', pen: true, obs: true, ofz: false, proc: [], bldH: 6,
     surf: new Set(ALL_KEYS), rot: true, zex: 2 };   // zex: vertical exaggeration, 2× by default so relief reads at 1:1-ish views
 
   // ---------- coordinates / geometry core (per-runway frames) ----------
@@ -225,12 +226,12 @@ export function createEngine(canvas, cb) {
     state.extA = AP.rwys.map(() => 0); state.extB = AP.rwys.map(() => 0); state.par = []; state.showEx = false;
     if (AP.ext) (AP.ext.end === 'A' ? state.extA : state.extB)[AP.ext.ri] = AP.ext.len;   // registry preset (PMIA 32R +750 m)
     if (!AP.dem) { if (AP.demFile) loadFileTerrain(); else loadOnlineTerrain(); }
-    K.s = K.o = K.g = K.t = K.b = null; sync(); fit('all'); emit();
+    K.s = K.o = K.g = K.t = K.b = K.p = null; sync(); fit('all'); emit();
   }
   function snapshot() {
     const ap = APID && AIRPORTS[APID];
     return { apId: APID, loading: !!ap && !ap.osm && !ap._failed, failed: !!ap && !!ap._failed, pending: texPending,
-      ap: AP ? { name: AP.name, sub: AP.sub, E: AP.E, code: AP.code || 4, origin: AP.osm.origin, ext: AP.ext || null, assume: AP.assume,
+      ap: AP ? { procs: (PROCEDURES[APID] || []).map(p => ({ id: p.id, name: p.name, color: p.color })), name: AP.name, sub: AP.sub, E: AP.E, code: AP.code || 4, origin: AP.osm.origin, ext: AP.ext || null, assume: AP.assume,
         rwys: AP.rwys.map((r, i) => ({ id: r.id, len: r.len, on: AP._on[i], nameA: r.nameA, nameB: r.nameB })),
         dem: AP.dem ? 'ok' : AP._demLoading ? 'loading' : AP._demFailed ? 'failed' : 'none', demSrc: AP.dem && AP.dem.src } : null,
       state: { ...state, surf: [...state.surf], extA: [...state.extA], extB: [...state.extB], par: state.par.map(p => ({ ...p })), scen: scen() } };
@@ -246,7 +247,7 @@ export function createEngine(canvas, cb) {
   scene.add(new THREE.HemisphereLight(0xffffff, 0x2a2d33, 0.75));
   const sun = new THREE.DirectionalLight(0xffffff, 1.1); sun.position.set(-1, 0.6, -1); scene.add(sun);   // low sun from the north-west, like a hillshade
   const G = new THREE.Group(); G.scale.y = state.zex; scene.add(G);          // metres. ENU (x,y,z) → three (x, z, -y). G.scale.y = vertical exaggeration
-  const L = { ground: null, groundEx: null, surf: [], grid: [], obs: null, obsList: [], rwy: [] };
+  const L = { ground: null, groundEx: null, surf: [], grid: [], obs: null, obsList: [], rwy: [], proc: [] };
   const K = {};
   let alive = true, texPending = false, syncQueued = false;
   const texCv = document.createElement('canvas'), ovCv = document.createElement('canvas'), hsCv = document.createElement('canvas');
@@ -381,6 +382,42 @@ export function createEngine(canvas, cb) {
       strip(rw.baseA, rw.baseB, rw.eA, rw.eB, rw.on ? 0xe8e4dc : 0x6b675f); });
     if (scen() !== 'ex') rwsExt.slice(rwsEx.length).forEach(rw => strip(rw.A, rw.B, rw.eA, rw.eB, 0xe8a55a)); }   // added parallel runways
 
+  // Instrument procedures (src/data/procedures.js): each leg a straight tube at its chart altitude, a faint curtain down to
+  // the ground so the height over terrain reads, and a labelled marker per fix. Labels live in the scene (not G) so the
+  // vertical exaggeration does not stretch them.
+  // With a runway extension (scenario), points on that runway's extended centreline move with the nearer runway end:
+  // the straight-in course and threshold with the landing end, the 500 ft missed-approach turn with the far end. IAFs and
+  // fixes off the centreline (DME turn points, holding fixes) stay where they are published.
+  function procShift(pr) { const i = AP.rwys.findIndex(r => r.nameA === pr.rwy || r.nameB === pr.rwy); if (i < 0) return P => P;
+    const rw = frames(scen() !== 'ex')[i], dA = [rw.A[0] - rw.baseA[0], rw.A[1] - rw.baseA[1]], dB = [rw.B[0] - rw.baseB[0], rw.B[1] - rw.baseB[1]];
+    return P => { const px = P[0] - rw.baseA[0], py = P[1] - rw.baseA[1], s = px * rw.U[0] + py * rw.U[1], d = px * rw.N[0] + py * rw.N[1];
+      if (Math.abs(d) > 150) return P; const m = s < rw.baseL / 2 ? dA : dB; return [P[0] + m[0], P[1] + m[1]]; }; }
+  function buildProcs() {
+    L.proc.forEach(o => { o.parent.remove(o); o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose(); }); L.proc.length = 0;
+    const procs = (PROCEDURES[APID] || []).filter(p => state.proc.includes(p.id)); if (!procs.length) return;
+    const add = (o, parent = G) => { parent.add(o); L.proc.push(o); }, zex = G.scale.y, seen = new Set();
+    for (const pr of procs) for (const path of pr.paths) { const mv = procShift(pr);
+      const pts = path.legs.map(([, lat, lon, ft], i) => { const P = LL(AP, [lat, lon]), [x, y] = i || path.ma ? mv(P) : P; return new THREE.Vector3(x, ft * 0.3048, -y); });
+      const curve = new THREE.CurvePath(); for (let i = 1; i < pts.length; i++) curve.add(new THREE.LineCurve3(pts[i - 1], pts[i]));
+      add(new THREE.Mesh(new THREE.TubeGeometry(curve, 64 * (pts.length - 1), 22, 6, false),
+        new THREE.MeshBasicMaterial({ color: path.ma ? 0xf5a524 : pr.color })));
+      const V = [], D = [], gz = v => Math.max(0, demAt(v.x, -v.z) ?? 0);
+      for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], ga = gz(a), gb = gz(b);
+        V.push(a.x, a.y, a.z, b.x, b.y, b.z, b.x, gb, b.z, a.x, a.y, a.z, b.x, gb, b.z, a.x, ga, a.z); }
+      const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.Float32BufferAttribute(V, 3));
+      add(new THREE.Mesh(cg, new THREE.MeshBasicMaterial({ color: path.ma ? 0xf5a524 : pr.color, transparent: true, opacity: .12, side: THREE.DoubleSide, depthWrite: false })));
+      path.legs.forEach(([name, lat, lon, ft, flag], i) => { const v = pts[i]; D.push(v.x, v.y, v.z, v.x, gz(v), v.z);
+        const key = name + lat + lon; if (seen.has(key)) return; seen.add(key);
+        const cv = document.createElement('canvas'); cv.width = 320; cv.height = 96; const c = cv.getContext('2d');
+        c.font = '600 34px system-ui, sans-serif'; c.fillStyle = '#fff'; c.textAlign = 'center'; c.fillText(name, 160, 40);
+        c.font = '28px ui-monospace, monospace'; c.fillStyle = 'rgba(255,255,255,.7)'; c.fillText((flag === 'ap' ? '≈ ' : '') + ft.toLocaleString('en') + ' ft', 160, 80);
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthTest: false, sizeAttenuation: false }));
+        sp.scale.set(.1, .03, 1); sp.center.set(.5, -.4); sp.position.set(v.x, v.y * zex, v.z); add(sp, scene);
+        const dot = new THREE.Mesh(new THREE.SphereGeometry(55, 12, 8), new THREE.MeshBasicMaterial({ color: flag === 'ap' ? 0x9aa0a6 : 0xffffff }));
+        dot.position.copy(v); dot.scale.y = 1 / zex; add(dot); });
+      const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.Float32BufferAttribute(D, 3));
+      add(new THREE.LineSegments(dg, new THREE.LineBasicMaterial({ color: path.ma ? 0xf5a524 : pr.color, transparent: true, opacity: .45 }))); } }
+
   function sync() { if (!alive || !AP) return;
     const rwsEx = frames(false), rwsExt = frames(true), rws = scen() === 'ext' ? rwsExt : rwsEx;
     const kG = APID + '|' + (AP.dem ? 1 : 0); if (K.g !== kG) { K.g = kG; buildGround(); K.t = null; K.o = null; }   // terrain arrived after the first draw: obstacles' ground heights must be rebuilt too
@@ -391,7 +428,8 @@ export function createEngine(canvas, cb) {
     const kO = k0 + '|' + state.bldH + '|' + state.obs; if (K.o !== kO) { K.o = kO; buildObstacles(rws); }
     const kT = k0 + '|' + state.pen, kB = kT + '|' + state.base;
     if (K.t !== kT) { K.t = kT; buildOverlay(rwsEx, rwsExt); K.b = null; }
-    if (K.b !== kB || texPending) { K.b = kB; buildBase(); } }
+    if (K.b !== kB || texPending) { K.b = kB; buildBase(); }
+    const kP = [k0, state.proc.join(','), G.scale.y, AP.dem ? 1 : 0].join('|'); if (K.p !== kP) { K.p = kP; buildProcs(); } }
   function scheduleSync() { if (syncQueued) return; syncQueued = true; requestAnimationFrame(() => { syncQueued = false; sync(); }); }
   function fit(kind) { if (!AP) return; const r = kind === 'rwy' ? AP.fitRwy : AP.fitAll, ax = frames(false)[0], c = Wp(ax, ax.L / 2, 0);
     ctl.target.set(c[0], state.E * G.scale.y, -c[1]); camera.position.set(c[0] - r * .9, r * .8, -c[1] + r * .9); ctl.update(); }

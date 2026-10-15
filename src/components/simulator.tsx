@@ -98,6 +98,30 @@ export function Simulator() {
         {snap?.failed && <Note>Could not load the airport data (network).</Note>}
         {ap && <Note>{ap.sub} · AD {ap.E} m AMSL · Annex 14 code {ap.code} · terrain {ap.dem === "ok" ? "loaded" : ap.dem === "loading" ? "loading…" : ap.dem === "failed" ? "unavailable" : "none"}</Note>}
 
+        {ap && (
+          <>
+            <H>Runways</H>
+            <div className="flex flex-wrap gap-1.5">
+              <Toggle size="sm" className={pill} pressed={ap.rwys.every((r: any) => r.on)} onPressedChange={() => ap.rwys.forEach((_: any, i: number) => eng.current?.setRunway(i, true))}>All runways</Toggle>
+              {ap.rwys.map((r: any, i: number) => <Toggle key={r.id} size="sm" className={pill} pressed={r.on} onPressedChange={(v) => eng.current?.setRunway(i, v)}>RWY {r.id} <span className="font-mono text-[10px] text-white/45">{r.len} m</span></Toggle>)}
+            </div>
+          </>
+        )}
+
+        <H>Obstacle surfaces</H>
+        <div className="flex flex-wrap gap-1.5">
+          <Toggle size="sm" className={pill} pressed={surf.size === surfaces.length} onPressedChange={() => set({ surf: ALL_KEYS })}>All</Toggle>
+          {surfaces.map(([k, label, c]) => (
+            <span key={k} className="inline-flex items-center gap-1">
+              <Toggle size="sm" className={pill} pressed={surf.has(k)} onPressedChange={(v) => { const s = new Set(surf); if (v) s.add(k); else s.delete(k); set({ surf: [...s] }); }}>
+                <span className="size-1.5 rounded-full" style={{ background: hex(c) }} />{label}
+              </Toggle>
+              <button className="text-[10px] text-white/35 hover:text-white/80" onClick={() => set({ surf: [k] })}>only</button>
+            </span>
+          ))}
+        </div>
+        <Note>ICAO Annex 14 Vol. I Tab. 4-1 / 4-2, code {ap?.code ?? 4}. Combined OLS = the lowest surface of the included runways.</Note>
+
         {ap && st && (
           <>
             <H>Scenario</H>
@@ -158,30 +182,20 @@ export function Simulator() {
           </>
         )}
 
-        <H>Obstacle surfaces</H>
-        <div className="flex flex-wrap gap-1.5">
-          <Toggle size="sm" className={pill} pressed={surf.size === surfaces.length} onPressedChange={() => set({ surf: ALL_KEYS })}>All</Toggle>
-          {surfaces.map(([k, label, c]) => (
-            <span key={k} className="inline-flex items-center gap-1">
-              <Toggle size="sm" className={pill} pressed={surf.has(k)} onPressedChange={(v) => { const s = new Set(surf); if (v) s.add(k); else s.delete(k); set({ surf: [...s] }); }}>
-                <span className="size-1.5 rounded-full" style={{ background: hex(c) }} />{label}
-              </Toggle>
-              <button className="text-[10px] text-white/35 hover:text-white/80" onClick={() => set({ surf: [k] })}>only</button>
-            </span>
-          ))}
-        </div>
-        <Note>ICAO Annex 14 Vol. I Tab. 4-1 / 4-2, code {ap?.code ?? 4}. Combined OLS = the lowest surface of the included runways.</Note>
-
-        {ap && (
+        {!!ap?.procs?.length && (
           <>
-            <H>Runways</H>
+            <H>Flight procedures</H>
             <div className="flex flex-wrap gap-1.5">
-              <Toggle size="sm" className={pill} pressed={ap.rwys.every((r: any) => r.on)} onPressedChange={() => ap.rwys.forEach((_: any, i: number) => eng.current?.setRunway(i, true))}>All runways</Toggle>
-              {ap.rwys.map((r: any, i: number) => <Toggle key={r.id} size="sm" className={pill} pressed={r.on} onPressedChange={(v) => eng.current?.setRunway(i, v)}>RWY {r.id} <span className="font-mono text-[10px] text-white/45">{r.len} m</span></Toggle>)}
+              <Toggle size="sm" className={pill} pressed={ap.procs.every((p: any) => st?.proc?.includes(p.id))} onPressedChange={(v) => set({ proc: v ? ap.procs.map((p: any) => p.id) : [] })}>All</Toggle>
+              {ap.procs.map((p: any) => (
+                <Toggle key={p.id} size="sm" className={pill} pressed={!!st?.proc?.includes(p.id)} onPressedChange={(v) => set({ proc: v ? [...(st?.proc ?? []), p.id] : (st?.proc ?? []).filter((x: string) => x !== p.id) })}>
+                  <span className="size-1.5 rounded-full" style={{ background: hex(p.color) }} />{p.name}
+                </Toggle>
+              ))}
             </div>
+            <Note>AIP RKSI AD 2-62 ~ 2-69, ILS or LOC CAT II &amp; III (AMDT 13/25). Approaches at chart minimum altitudes, straight legs from PAMBI or ENPIL. Orange: missed approach, turn points approximate (≈).</Note>
           </>
         )}
-
         <H>Check</H>
         <div className="flex flex-wrap gap-1.5">
           <Toggle size="sm" className={pill} pressed={!!st?.obs} onPressedChange={(v) => set({ obs: v })}><span className="size-1.5 rounded-full bg-[#e0443e]" />Buildings through them</Toggle>
