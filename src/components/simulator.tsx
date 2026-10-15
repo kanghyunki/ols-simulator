@@ -23,7 +23,7 @@ function H({ children }: { children: React.ReactNode }) { return <div className=
 function Note({ children }: { children: React.ReactNode }) { return <p className="mt-1.5 max-w-[250px] text-[10.5px] leading-snug text-white/40">{children}</p>; }
 const fmt = (v: number, d = 1) => v.toFixed(d);
 
-export function Simulator() {
+export function Simulator({ onHome }: { onHome: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const eng = useRef<Engine | null>(null);
   const [snap, setSnap] = useState<Snap | null>(null);
@@ -62,8 +62,12 @@ export function Simulator() {
 
       {/* top bar */}
       <div className="pointer-events-none absolute top-0 right-0 left-0 flex items-center justify-between px-7 py-4 text-[11.5px] text-white/60 max-md:px-3 max-md:py-2.5">
-        <span className="font-mono tracking-wide max-md:hidden">{ap ? `${Math.abs(ap.origin[0]).toFixed(4)}°${ap.origin[0] < 0 ? "S" : "N"}  ${Math.abs(ap.origin[1]).toFixed(4)}°${ap.origin[1] < 0 ? "W" : "E"}` : ""}</span>
-        <Button size="xs" className={`${pill} pointer-events-auto md:hidden`} onClick={() => setMenu((m) => !m)}>{menu ? "Close" : "Controls"}</Button>
+        <span className="flex items-center gap-3">
+          <button type="button" onClick={onHome} className="pointer-events-auto flex items-center gap-1.5 text-[13px] font-medium text-white/80 transition hover:text-white">
+            <svg viewBox="0 0 20 20" className="size-4" aria-hidden><path d="M16 10H4M9 5l-5 5 5 5" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>Home
+          </button>
+          <Button size="xs" className={`${pill} pointer-events-auto md:hidden`} onClick={() => setMenu((m) => !m)}>{menu ? "Close" : "Controls"}</Button>
+        </span>
         <span className="flex items-center gap-4">
           {ap && <span className="text-white/80 max-md:hidden">{ap.sub}</span>}
           <span className="text-[13px] font-semibold tracking-tight text-white">CADIP-II · OLS Simulator</span>
@@ -249,6 +253,7 @@ export function Simulator() {
         </div>
       </div>
 
+      <span className="pointer-events-none absolute right-7 bottom-9 font-mono text-[11.5px] tracking-wide text-white/60 max-md:hidden">{ap ? `${Math.abs(ap.origin[0]).toFixed(4)}°${ap.origin[0] < 0 ? "S" : "N"}  ${Math.abs(ap.origin[1]).toFixed(4)}°${ap.origin[1] < 0 ? "W" : "E"}` : ""}</span>
       <div className="pointer-events-none absolute right-7 bottom-3 left-7 flex justify-between text-[10.5px] text-white/35 max-md:inset-x-3 max-md:bottom-1 max-md:text-[9px]">
         <span className="max-md:hidden">Drag to orbit · scroll to zoom · right-drag to pan · hover a building for its clearance</span>
         <span className="truncate">Terrain GEDTM30 © OpenGeoHub (CC BY 4.0) · Buildings © OpenStreetMap contributors · Imagery © Esri</span>
