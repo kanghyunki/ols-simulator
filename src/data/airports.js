@@ -184,6 +184,161 @@ const AIRPORTS={
       +'· 지형: 온라인 <b>AWS Terrain Tiles</b>(terrarium, ~30m)를 접속 시 자동 로드해 지형 저촉 검토에 사용 — 오프라인이면 지형 검토 없이 동작. 건물은 OSM height/levels 태그 보유분만.<br>'
       +'· 전 활주로 CAT III 정밀 → OLS 제원은 Tab.4-1 Code 4 (CAT I과 동일), OFZ 옵션. 활주로 순번(R1–R4)은 편의상 표기.'
   },
+  // 한국 14개 공항 — 시단 좌표·표고·CWY: AIP 대한민국 eAIP 2026-09-17 패키지(aim.koca.go.kr) AD 2.2/2.12/2.13
+  RKSS:{
+    name:'김포', sub:'RKSS · Gimpo Intl · Seoul · Korea', region:'NEA', E:18.0,
+    osm:null, dem:null,
+    rwys:[ // THR 좌표·표고: AIP 대한민국 RKSS AD 2.12 (2026-09-17)
+      {id:'14L/32R', nameA:'14L', nameB:'32R', len:3600,
+       llA:[37.5707083,126.7782778], llB:[37.5477472,126.8071056], eA:11.6, eB:12.8, cwyA:300, cwyB:300},
+      {id:'14R/32L', nameA:'14R', nameB:'32L', len:3200,
+       llA:[37.5683861,126.7754444], llB:[37.5480083,126.8010306], eA:10.4, eB:12.6, cwyA:300, cwyB:300}
+    ],
+    bgRwy:[], ext:null, fitAll:13000, fitRwy:4400,
+    assume:'· 시단 좌표·표고(14L 11.6/32R 12.8m, 14R 10.4/32L 12.6m), AD 표고 18.0m, 활주로 14L/32R 3600×45m, 14R/32L 3200×60m: <b>AIP 대한민국 RKSS AD 2.2/2.12 (2026-09-17 패키지)</b>.<br>· CWY는 AD 2.13 TODA−TORA(14L 300/32R 300m, 14R 300/32L 300m).<br>· 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드. 건물: OSM height/levels 태그 보유분(도심 공항 — 높이 20m 이상 또는 6층 이상만 수록).<br>· 계기활주로(ILS) 보유 → OLS 제원은 Tab.4-1 Code 4 정밀(CAT I) 기준, OFZ 옵션. 이설 시단·교차 이륙 제원은 미반영.'
+  },
+  RKPK:{
+    name:'김해', sub:'RKPK · Gimhae Intl · Busan · Korea', region:'NEA', E:4.0,
+    osm:null, dem:null,
+    rwys:[ // THR 좌표·표고: AIP 대한민국 RKPK AD 2.12 (2026-09-17)
+      {id:'18R/36L', nameA:'18R', nameB:'36L', len:3200,
+       llA:[35.1938722,128.9351278], llB:[35.1651917,128.9388306], eA:4.0, eB:3.7, cwyA:300, cwyB:300},
+      {id:'18L/36R', nameA:'18L', nameB:'36R', len:2743,
+       llA:[35.1940556,128.9374250], llB:[35.1694722,128.9405944], eA:3.0, eB:2.3, cwyA:300, cwyB:300}
+    ],
+    bgRwy:[], ext:null, fitAll:13000, fitRwy:4000,
+    assume:'· 시단 좌표·표고(18R 4.0/36L 3.7m, 18L 3.0/36R 2.3m), AD 표고 4.0m, 활주로 18R/36L 3200×60m, 18L/36R 2743×46m: <b>AIP 대한민국 RKPK AD 2.2/2.12 (2026-09-17 패키지)</b>.<br>· CWY는 AD 2.13 TODA−TORA(18R 300/36L 300m, 18L 300/36R 300m).<br>· 군·민 공용 비행장 — 군 활주로 포함, 착륙대 폭 등 Annex 14 미충족 항목이 AIP에 명시된 곳 있음.<br>· 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드. 건물: OSM height/levels 태그 보유분(도심 공항 — 높이 20m 이상 또는 6층 이상만 수록).<br>· 계기활주로(ILS) 보유 → OLS 제원은 Tab.4-1 Code 4 정밀(CAT I) 기준, OFZ 옵션. 이설 시단·교차 이륙 제원은 미반영.'
+  },
+  RKPC:{
+    name:'제주', sub:'RKPC · Jeju Intl · Korea', region:'NEA', E:36.0,
+    osm:null, dem:null,
+    rwys:[ // THR 좌표·표고: AIP 대한민국 RKPC AD 2.12 (2026-09-17)
+      {id:'07/25', nameA:'07', nameB:'25', len:3180,
+       llA:[33.4998806,126.4684722], llB:[33.5148778,126.4976417], eA:26.6, eB:23.3, cwyA:300, cwyB:300},
+      {id:'13/31', nameA:'13', nameB:'31', len:1900,
+       llA:[33.5154611,126.4873944], llB:[33.5054833,126.5040139], eA:20.0, eB:36.0, cwyA:60, cwyB:130}
+    ],
+    bgRwy:[], ext:null, fitAll:13000, fitRwy:3980,
+    assume:'· 시단 좌표·표고(07 26.6/25 23.3m, 13 20.0/31 36.0m), AD 표고 36.0m, 활주로 07/25 3180×45m, 13/31 1900×45m: <b>AIP 대한민국 RKPC AD 2.2/2.12 (2026-09-17 패키지)</b>.<br>· CWY는 AD 2.13 TODA−TORA(07 300/25 300m, 13 60/31 130m).<br>· 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드. 건물: OSM height/levels 태그 보유분(도심 공항 — 높이 20m 이상 또는 6층 이상만 수록).<br>· 계기활주로(ILS) 보유 → OLS 제원은 Tab.4-1 Code 4 정밀(CAT I) 기준, OFZ 옵션. 이설 시단·교차 이륙 제원은 미반영.'
+  },
+  RKTN:{
+    name:'대구', sub:'RKTN · Daegu Intl · Korea', region:'NEA', E:36.6,
+    osm:null, dem:null,
+    rwys:[ // THR 좌표·표고: AIP 대한민국 RKTN AD 2.12 (2026-09-17)
+      {id:'13R/31L', nameA:'13R', nameB:'31L', len:2755,
+       llA:[35.9006056,128.6458500], llB:[35.8866389,128.6710833], eA:33.4, eB:35.9, cwyA:0, cwyB:0},
+      {id:'13L/31R', nameA:'13L', nameB:'31R', len:2743,
+       llA:[35.9014917,128.6467639], llB:[35.8875833,128.6718944], eA:34.0, eB:36.6, cwyA:0, cwyB:0}
+    ],
+    bgRwy:[], ext:null, fitAll:11000, fitRwy:3555,
+    assume:'· 시단 좌표·표고(13R 33.4/31L 35.9m, 13L 34.0/31R 36.6m), AD 표고 36.6m, 활주로 13R/31L 2755×45m, 13L/31R 2743×45m: <b>AIP 대한민국 RKTN AD 2.2/2.12 (2026-09-17 패키지)</b>.<br>· CWY는 AD 2.13 TODA−TORA(13R 0/31L 0m, 13L 0/31R 0m); 0은 TODA=TORA(CWY 미공시).<br>· 군·민 공용 비행장 — 군 활주로 포함, 착륙대 폭 등 Annex 14 미충족 항목이 AIP에 명시된 곳 있음.<br>· 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드. 건물: OSM height/levels 태그 보유분(도심 공항 — 높이 20m 이상 또는 6층 이상만 수록).<br>· 계기활주로(ILS) 보유 → OLS 제원은 Tab.4-1 Code 4 정밀(CAT I) 기준, OFZ 옵션. 이설 시단·교차 이륙 제원은 미반영.'
+  },
+  RKJB:{
+    name:'무안', sub:'RKJB · Muan Intl · Korea', region:'NEA', E:16.0,
+    osm:null, dem:null,
+    rwys:[ // THR 좌표·표고: AIP 대한민국 RKJB AD 2.12 (2026-09-17)
+      {id:'01/19', nameA:'01', nameB:'19', len:2800,
+       llA:[34.9787889,126.3829028], llB:[35.0040250,126.3827278], eA:9.9, eB:15.5, cwyA:200, cwyB:200}
+    ],
+    bgRwy:[], ext:null, fitAll:11000, fitRwy:3600,
+    assume:'· 시단 좌표·표고(01 9.9/19 15.5m), AD 표고 16.0m, 활주로 01/19 2800×45m: <b>AIP 대한민국 RKJB AD 2.2/2.12 (2026-09-17 패키지)</b>.<br>· CWY는 AD 2.13 TODA−TORA(01 200/19 200m).<br>· 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드. 건물: OSM height/levels 태그 보유분.<br>· 계기활주로(ILS) 보유 → OLS 제원은 Tab.4-1 Code 4 정밀(CAT I) 기준, OFZ 옵션. 이설 시단·교차 이륙 제원은 미반영.'
+  },
+  RKJJ:{
+    name:'광주', sub:'RKJJ · Gwangju · Korea', region:'NEA', E:15.0,
+    osm:null, dem:null,
+    rwys:[ // THR 좌표·표고: AIP 대한민국 RKJJ AD 2.12 (2026-09-17)
+      {id:'04R/22L', nameA:'04R', nameB:'22L', len:2835,
+       llA:[35.1147444,126.8020583], llB:[35.1368917,126.8175722], eA:13.22, eB:14.1, cwyA:305, cwyB:305},
+      {id:'04L/22R', nameA:'04L', nameB:'22R', len:2835,
+       llA:[35.1156139,126.8002194], llB:[35.1377611,126.8157333], eA:13.42, eB:14.69, cwyA:306, cwyB:306}
+    ],
+    bgRwy:[], ext:null, fitAll:11000, fitRwy:3635,
+    assume:'· 시단 좌표·표고(04R 13.22/22L 14.1m, 04L 13.42/22R 14.69m), AD 표고 15.0m, 활주로 04R/22L 2835×45m, 04L/22R 2835×45m: <b>AIP 대한민국 RKJJ AD 2.2/2.12 (2026-09-17 패키지)</b>.<br>· CWY는 AD 2.13 TODA−TORA(04R 305/22L 305m, 04L 306/22R 306m).<br>· 군·민 공용 비행장 — 군 활주로 포함, 착륙대 폭 등 Annex 14 미충족 항목이 AIP에 명시된 곳 있음.<br>· 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드. 건물: OSM height/levels 태그 보유분(도심 공항 — 높이 20m 이상 또는 6층 이상만 수록).<br>· 계기활주로(ILS) 보유 → OLS 제원은 Tab.4-1 Code 4 정밀(CAT I) 기준, OFZ 옵션. 이설 시단·교차 이륙 제원은 미반영.'
+  },
+  RKJY:{
+    name:'여수', sub:'RKJY · Yeosu · Korea', region:'NEA', E:16.0,
+    osm:null, dem:null,
+    rwys:[ // THR 좌표·표고: AIP 대한민국 RKJY AD 2.12 (2026-09-17)
+      {id:'17/35', nameA:'17', nameB:'35', len:2100,
+       llA:[34.8510361,127.6129917], llB:[34.8334806,127.6215833], eA:8.7, eB:9.5, cwyA:268, cwyB:300}
+    ],
+    bgRwy:[], ext:null, fitAll:11000, fitRwy:2900,
+    assume:'· 시단 좌표·표고(17 8.7/35 9.5m), AD 표고 16.0m, 활주로 17/35 2100×45m: <b>AIP 대한민국 RKJY AD 2.2/2.12 (2026-09-17 패키지)</b>.<br>· CWY는 AD 2.13 TODA−TORA(17 268/35 300m).<br>· 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드. 건물: OSM height/levels 태그 보유분.<br>· 계기활주로(ILS) 보유 → OLS 제원은 Tab.4-1 Code 4 정밀(CAT I) 기준, OFZ 옵션. 이설 시단·교차 이륙 제원은 미반영.'
+  },
+  RKPU:{
+    name:'울산', sub:'RKPU · Ulsan · Korea', region:'NEA', E:13.0,
+    osm:null, dem:null,
+    rwys:[ // THR 좌표·표고: AIP 대한민국 RKPU AD 2.12 (2026-09-17)
+      {id:'18/36', nameA:'18', nameB:'36', len:2000,
+       llA:[35.6024694,129.3509833], llB:[35.5844861,129.3524861], eA:13.0, eB:8.5, cwyA:200, cwyB:0}
+    ],
+    bgRwy:[], ext:null, fitAll:11000, fitRwy:2800,
+    assume:'· 시단 좌표·표고(18 13.0/36 8.5m), AD 표고 13.0m, 활주로 18/36 2000×45m: <b>AIP 대한민국 RKPU AD 2.2/2.12 (2026-09-17 패키지)</b>.<br>· CWY는 AD 2.13 TODA−TORA(18 200/36 0m); 0은 TODA=TORA(CWY 미공시).<br>· 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드. 건물: OSM height/levels 태그 보유분(도심 공항 — 높이 20m 이상 또는 6층 이상만 수록).<br>· 계기활주로(ILS) 보유 → OLS 제원은 Tab.4-1 Code 4 정밀(CAT I) 기준, OFZ 옵션. 이설 시단·교차 이륙 제원은 미반영.'
+  },
+  RKTU:{
+    name:'청주', sub:'RKTU · Cheongju Intl · Korea', region:'NEA', E:58.0,
+    osm:null, dem:null,
+    rwys:[ // THR 좌표·표고: AIP 대한민국 RKTU AD 2.12 (2026-09-17)
+      {id:'06L/24R', nameA:'06L', nameB:'24R', len:2744,
+       llA:[36.7100278,127.4867944], llB:[36.7251056,127.5111250], eA:50.6, eB:56.5, cwyA:0, cwyB:0},
+      {id:'06R/24L', nameA:'06R', nameB:'24L', len:2744,
+       llA:[36.7078500,127.4874556], llB:[36.7229250,127.5117944], eA:52.202, eB:58.357, cwyA:0, cwyB:0}
+    ],
+    bgRwy:[], ext:null, fitAll:11000, fitRwy:3544,
+    assume:'· 시단 좌표·표고(06L 50.6/24R 56.5m, 06R 52.202/24L 58.357m), AD 표고 58.0m, 활주로 06L/24R 2744×60m, 06R/24L 2744×45m: <b>AIP 대한민국 RKTU AD 2.2/2.12 (2026-09-17 패키지)</b>.<br>· CWY는 AD 2.13 TODA−TORA(06L 0/24R 0m, 06R 0/24L 0m); 0은 TODA=TORA(CWY 미공시).<br>· 군·민 공용 비행장 — 군 활주로 포함, 착륙대 폭 등 Annex 14 미충족 항목이 AIP에 명시된 곳 있음.<br>· 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드. 건물: OSM height/levels 태그 보유분(도심 공항 — 높이 20m 이상 또는 6층 이상만 수록).<br>· 계기활주로(ILS) 보유 → OLS 제원은 Tab.4-1 Code 4 정밀(CAT I) 기준, OFZ 옵션. 이설 시단·교차 이륙 제원은 미반영.'
+  },
+  RKNY:{
+    name:'양양', sub:'RKNY · Yangyang Intl · Korea', region:'NEA', E:73.0,
+    osm:null, dem:null,
+    rwys:[ // THR 좌표·표고: AIP 대한민국 RKNY AD 2.12 (2026-09-17)
+      {id:'15/33', nameA:'15', nameB:'33', len:2500,
+       llA:[38.0700500,128.6601833], llB:[38.0525583,128.6781250], eA:70.1, eB:69.1, cwyA:345, cwyB:345}
+    ],
+    bgRwy:[], ext:null, fitAll:11000, fitRwy:3300,
+    assume:'· 시단 좌표·표고(15 70.1/33 69.1m), AD 표고 73.0m, 활주로 15/33 2500×45m: <b>AIP 대한민국 RKNY AD 2.2/2.12 (2026-09-17 패키지)</b>.<br>· CWY는 AD 2.13 TODA−TORA(15 345/33 345m).<br>· 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드. 건물: OSM height/levels 태그 보유분.<br>· 계기활주로(ILS) 보유 → OLS 제원은 Tab.4-1 Code 4 정밀(CAT I) 기준, OFZ 옵션. 이설 시단·교차 이륙 제원은 미반영.'
+  },
+  RKTH:{
+    name:'포항경주', sub:'RKTH · Pohang Gyeongju · Korea', region:'NEA', E:23.0,
+    osm:null, dem:null,
+    rwys:[ // THR 좌표·표고: AIP 대한민국 RKTH AD 2.12 (2026-09-17)
+      {id:'10/28', nameA:'10', nameB:'28', len:2133,
+       llA:[35.9878111,129.4085417], llB:[35.9880667,129.4321972], eA:23.0, eB:19.0, cwyA:0, cwyB:0}
+    ],
+    bgRwy:[], ext:null, fitAll:11000, fitRwy:2933,
+    assume:'· 시단 좌표·표고(10 23.0/28 19.0m), AD 표고 23.0m, 활주로 10/28 2133×46m: <b>AIP 대한민국 RKTH AD 2.2/2.12 (2026-09-17 패키지)</b>.<br>· CWY는 AD 2.13 TODA−TORA(10 0/28 0m); 0은 TODA=TORA(CWY 미공시).<br>· 군·민 공용 비행장 — 군 활주로 포함, 착륙대 폭 등 Annex 14 미충족 항목이 AIP에 명시된 곳 있음.<br>· 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드. 건물: OSM height/levels 태그 보유분.<br>· 계기활주로(ILS) 보유 → OLS 제원은 Tab.4-1 Code 4 정밀(CAT I) 기준, OFZ 옵션. 이설 시단·교차 이륙 제원은 미반영.'
+  },
+  RKPS:{
+    name:'사천', sub:'RKPS · Sacheon · Korea', region:'NEA', E:8.0,
+    osm:null, dem:null,
+    rwys:[ // THR 좌표·표고: AIP 대한민국 RKPS AD 2.12 (2026-09-17)
+      {id:'06R/24L', nameA:'06R', nameB:'24L', len:2743,
+       llA:[35.0812861,128.0596861], llB:[35.0952583,128.0845056], eA:5.0, eB:7.0, cwyA:300, cwyB:300},
+      {id:'06L/24R', nameA:'06L', nameB:'24R', len:2743,
+       llA:[35.0822083,128.0568917], llB:[35.0961833,128.0817111], eA:5.0, eB:5.9, cwyA:300, cwyB:185}
+    ],
+    bgRwy:[], ext:null, fitAll:11000, fitRwy:3543,
+    assume:'· 시단 좌표·표고(06R 5.0/24L 7.0m, 06L 5.0/24R 5.9m), AD 표고 8.0m, 활주로 06R/24L 2743×46m, 06L/24R 2743×46m: <b>AIP 대한민국 RKPS AD 2.2/2.12 (2026-09-17 패키지)</b>.<br>· CWY는 AD 2.13 TODA−TORA(06R 300/24L 300m, 06L 300/24R 185m).<br>· 군·민 공용 비행장 — 군 활주로 포함, 착륙대 폭 등 Annex 14 미충족 항목이 AIP에 명시된 곳 있음.<br>· 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드. 건물: OSM height/levels 태그 보유분.<br>· 계기활주로(ILS) 보유 → OLS 제원은 Tab.4-1 Code 4 정밀(CAT I) 기준, OFZ 옵션. 이설 시단·교차 이륙 제원은 미반영.'
+  },
+  RKJK:{
+    name:'군산', sub:'RKJK · Gunsan · Korea', region:'NEA', E:9.0,
+    osm:null, dem:null,
+    rwys:[ // THR 좌표·표고: AIP 대한민국 RKJK AD 2.12 (2026-09-17)
+      {id:'18/36', nameA:'18', nameB:'36', len:2746,
+       llA:[35.9159139,126.6130056], llB:[35.8916194,126.6187861], eA:5.3, eB:8.2, cwyA:0, cwyB:0}
+    ],
+    bgRwy:[], ext:null, fitAll:11000, fitRwy:3546,
+    assume:'· 시단 좌표·표고(18 5.3/36 8.2m), AD 표고 9.0m, 활주로 18/36 2746×46m: <b>AIP 대한민국 RKJK AD 2.2/2.12 (2026-09-17 패키지)</b>.<br>· CWY는 AD 2.13 TODA−TORA(18 0/36 0m); 0은 TODA=TORA(CWY 미공시).<br>· 군·민 공용 비행장 — 군 활주로 포함, 착륙대 폭 등 Annex 14 미충족 항목이 AIP에 명시된 곳 있음.<br>· 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드. 건물: OSM height/levels 태그 보유분.<br>· 계기활주로(ILS) 보유 → OLS 제원은 Tab.4-1 Code 4 정밀(CAT I) 기준, OFZ 옵션. 이설 시단·교차 이륙 제원은 미반영.'
+  },
+  RKNW:{
+    name:'원주', sub:'RKNW · Wonju · Korea', region:'NEA', E:100.6,
+    osm:null, dem:null,
+    rwys:[ // THR 좌표·표고: AIP 대한민국 RKNW AD 2.12 (2026-09-17)
+      {id:'03/21', nameA:'03', nameB:'21', len:2743,
+       llA:[37.4269389,127.9535417], llB:[37.4490944,127.9672861], eA:99.0, eB:100.7, cwyA:0, cwyB:0}
+    ],
+    bgRwy:[], ext:null, fitAll:11000, fitRwy:3543,
+    assume:'· 시단 좌표·표고(03 99.0/21 100.7m), AD 표고 100.6m, 활주로 03/21 2743×45m: <b>AIP 대한민국 RKNW AD 2.2/2.12 (2026-09-17 패키지)</b>.<br>· CWY는 AD 2.13 TODA−TORA(03 0/21 0m); 0은 TODA=TORA(CWY 미공시).<br>· 군·민 공용 비행장 — 군 활주로 포함, 착륙대 폭 등 Annex 14 미충족 항목이 AIP에 명시된 곳 있음.<br>· 지형: 온라인 <b>AWS Terrain Tiles</b>(~30m) 자동 로드. 건물: OSM height/levels 태그 보유분.<br>· 계기활주로(ILS) 보유 → OLS 제원은 Tab.4-1 Code 4 정밀(CAT I) 기준, OFZ 옵션. 이설 시단·교차 이륙 제원은 미반영.'
+  },
   OEJN:{
     name:'제다', sub:'OEJN · King Abdulaziz Intl · Saudi Arabia', region:'MEA', E:15,
     osm:null, dem:null,
