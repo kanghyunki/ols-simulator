@@ -221,7 +221,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <span className="mr-1 text-[11px] text-white/45">Vertical</span>
           <ToggleGroup type="single" value={String(st?.zex ?? 1)} onValueChange={(v) => v && set({ zex: +v })} className="gap-1.5">
-            {[1, 2, 3].map((z) => <ToggleGroupItem key={z} value={String(z)} size="sm" className={pill}>{z}×</ToggleGroupItem>)}
+            {[1, 2, 5, 10].map((z) => <ToggleGroupItem key={z} value={String(z)} size="sm" className={pill}>{z}×</ToggleGroupItem>)}
           </ToggleGroup>
         </div>
         <Note>Buildings: OSM height / levels tags, untagged ones assumed {st?.bldH ?? 6} m. Terrain: {ap?.demSrc ?? "—"}.</Note>

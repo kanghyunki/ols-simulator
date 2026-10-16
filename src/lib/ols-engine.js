@@ -42,6 +42,10 @@ function ty2lat(ty, z) { const n = Math.PI - 2 * Math.PI * ty / (1 << z); return
 
 const TAG = { communications_tower: 'Communications tower', mast: 'Mast', tower: 'Tower', chimney: 'Chimney', water_tower: 'Water tower', lighthouse: 'Lighthouse', windmill: 'Windmill', power_tower: 'Power pylon', wind: 'Wind turbine' };
 
+// Airport data scripts in flight or loaded, shared by every engine: each osm_<ID>.js declares a top-level const, so it
+// must run only once per page even when a second engine starts before the first load finishes
+const _osmP = {};
+
 export function createEngine(canvas, cb) {
   // ---------- state ----------
   let AP = null, APID = null;
@@ -125,6 +129,9 @@ export function createEngine(canvas, cb) {
   // Each surface on its own (min over the included runways): { key: height } — for drawing full surfaces, not just the governing one
   function olsAll(P, rws) { const o = {};
     for (const rw of rws) { if (!rw.on) continue; olsCand(P, rw, (hh, n, k) => { if (!(k in o) || hh < o[k]) o[k] = hh; }); }
+    // With several runways the inner horizontal is their union: the conical starts at its outer edge, so a runway's
+    // conical must not show inside another runway's inner horizontal
+    if ('ih' in o) delete o.conical;
     return o; }
   // Combined OLS = minimum over the included runways
   function ols(P, rws, allow) { let best = null;
@@ -203,7 +210,6 @@ export function createEngine(canvas, cb) {
   const bTag = b => (b.t ? TAG[b.t] || b.t : 'Building') + ((b.est || !b.h) ? ' (assumed height)' : '');
 
   // ---------- airport data ----------
-  const _osmP = {};
   function loadOsm(id) {
     return _osmP[id] || (_osmP[id] = new Promise((res, rej) => {
       const s = document.createElement('script'); s.src = `/data/osm_${id}.js`;
@@ -432,7 +438,7 @@ export function createEngine(canvas, cb) {
     const kP = [k0, state.proc.join(','), G.scale.y, AP.dem ? 1 : 0].join('|'); if (K.p !== kP) { K.p = kP; buildProcs(); } }
   function scheduleSync() { if (syncQueued) return; syncQueued = true; requestAnimationFrame(() => { syncQueued = false; sync(); }); }
   function fit(kind) { if (!AP) return; const r = kind === 'rwy' ? AP.fitRwy : AP.fitAll, ax = frames(false)[0], c = Wp(ax, ax.L / 2, 0);
-    ctl.target.set(c[0], state.E * G.scale.y, -c[1]); camera.position.set(c[0] - r * .9, r * .8, -c[1] + r * .9); ctl.update(); }
+    ctl.target.set(c[0], state.E * G.scale.y, -c[1]); camera.position.set(c[0] - r * .9, state.E * G.scale.y + r * .8, -c[1] + r * .9); ctl.update(); }
   function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
   function loop() { if (!alive) return; ctl.update(); renderer.render(scene, camera); requestAnimationFrame(loop); }
 
@@ -454,7 +460,7 @@ export function createEngine(canvas, cb) {
     for (const [k, v] of Object.entries(patch)) { if (k === 'surf') state.surf = new Set(v); else if (k === 'extA' || k === 'extB') state[k] = [...v];
       else if (k === 'par') state.par = v.map(p => ({ ri: p.ri, off: +p.off || 0, len: Math.max(0, +p.len || 0) })).filter(p => AP && AP.rwys[p.ri]); else state[k] = v; }
     if ('rot' in patch) ctl.autoRotate = !!patch.rot;
-    if ('zex' in patch) { G.scale.y = +patch.zex; ctl.target.y = state.E * G.scale.y; }
+    if ('zex' in patch) { const dy = state.E * (+patch.zex - G.scale.y); G.scale.y = +patch.zex; ctl.target.y += dy; camera.position.y += dy; }   // keep the view: camera rides up with the aerodrome
     sync(); emit(); }
   // Summary for reports: terrain above the combined OLS on a 60 m grid (km², max), and the buildings through it
   function stats() { if (!AP) return null;
