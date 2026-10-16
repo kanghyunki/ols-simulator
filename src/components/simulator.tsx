@@ -110,7 +110,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
         </span>
         <span className="flex items-center gap-4">
           {ap && <span className="text-white/80 max-md:hidden">{ap.sub}</span>}
-          <span className="text-[13px] font-semibold tracking-tight text-white">CADIP-II · OLS Simulator</span>
+          <span className="text-[13px] font-semibold tracking-tight text-white">OLS Simulator</span>
         </span>
       </div>
 
