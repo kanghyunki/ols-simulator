@@ -54,8 +54,8 @@ export default function Page() {
                 <Logo />
                 {/* ponytail: menu items have no pages yet — buttons with no action until those pages exist */}
                 <nav className="flex items-center gap-9 text-[15px] text-white/85 max-lg:gap-6 max-md:hidden">
-                  {["Product", "Project", "About", "Process", "Contact"].map((t) => t === "About"
-                    ? <Link key={t} href="/about" className="transition hover:text-white">{t}</Link>
+                  {["Product", "Project", "About", "Process", "Contact"].map((t) => t === "About" || t === "Product" || t === "Project"
+                    ? <Link key={t} href={`/${t.toLowerCase()}`} className="transition hover:text-white">{t}</Link>
                     : <button key={t} type="button" className="transition hover:text-white">{t}</button>)}
                 </nav>
                 <div className="ml-auto flex items-center gap-6 text-[15px] max-md:gap-4">
@@ -99,7 +99,7 @@ export default function Page() {
               {FOOTER.map(([h, items]) => (
                 <div key={h}>
                   <div className="mb-5 text-[12px] tracking-[0.08em] text-white/45 uppercase">{h}</div>
-                  <ul className="space-y-3 text-white/80">{items.map((t) => <li key={t}>{t === "Company" ? <Link href="/about" className="transition hover:text-white">{t}</Link> : t}</li>)}</ul>
+                  <ul className="space-y-3 text-white/80">{items.map((t) => <li key={t}>{t === "Company" ? <Link href="/about" className="transition hover:text-white">{t}</Link> : t === "OLS Simulator" || t === "Flight Procedure" ? <Link href="/product" className="transition hover:text-white">{t}</Link> : t === "CADIP-II" || t === "Airports" ? <Link href="/project" className="transition hover:text-white">{t}</Link> : t}</li>)}</ul>
                 </div>
               ))}
               <div>

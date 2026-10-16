@@ -437,7 +437,13 @@ export function createEngine(canvas, cb) {
     if (K.b !== kB || texPending) { K.b = kB; buildBase(); }
     const kP = [k0, state.proc.join(','), G.scale.y, AP.dem ? 1 : 0].join('|'); if (K.p !== kP) { K.p = kP; buildProcs(); } }
   function scheduleSync() { if (syncQueued) return; syncQueued = true; requestAnimationFrame(() => { syncQueued = false; sync(); }); }
-  function fit(kind) { if (!AP) return; const r = kind === 'rwy' ? AP.fitRwy : AP.fitAll, ax = frames(false)[0], c = Wp(ax, ax.L / 2, 0);
+  function fit(kind) { if (!AP) return;
+    const procs = (PROCEDURES[APID] || []).filter(p => state.proc.includes(p.id));
+    if (kind === 'all' && procs.length) {   // overview with procedures shown: frame the whole procedure area
+      const P = procs.flatMap(p => p.paths.flatMap(q => q.legs.map(l => LL(AP, [l[1], l[2]])))), xs = P.map(q => q[0]), ys = P.map(q => q[1]);
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2, r = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) * .95;
+      ctl.target.set(cx, state.E * G.scale.y, -cy); camera.position.set(cx + r * .9, state.E * G.scale.y + r * .55, -cy + r * .6); ctl.update(); return; }
+    const r = kind === 'rwy' ? AP.fitRwy : AP.fitAll, ax = frames(false)[0], c = Wp(ax, ax.L / 2, 0);
     ctl.target.set(c[0], state.E * G.scale.y, -c[1]); camera.position.set(c[0] - r * .9, state.E * G.scale.y + r * .8, -c[1] + r * .9); ctl.update(); }
   function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
   function loop() { if (!alive) return; ctl.update(); renderer.render(scene, camera); requestAnimationFrame(loop); }

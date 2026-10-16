@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { PROCEDURES } from "@/data/procedures.js";
 import { createEngine, AIRPORTS, SURFACES as _S, OFZ_SURFACES as _O, ALL_KEYS as _K } from "@/lib/ols-engine.js";
 type Surf = [string, string, number];
 const SURFACES = _S as unknown as Surf[], OFZ_SURFACES = _O as unknown as Surf[], ALL_KEYS = _K as string[];
@@ -70,6 +71,9 @@ export function Simulator({ onHome }: { onHome: () => void }) {
     const id = (location.hash || "").replace("#", "").toUpperCase();
     const start = (AIRPORTS as any)[id] ? id : "ICN";
     setRegion((AIRPORTS as any)[start].region); setCountry(countryOf((AIRPORTS as any)[start]));
+    // ?proc=all (or ?proc=ILS33L,ILS34R) opens with those flight procedures shown — the Flight Procedure Simulator link
+    const proc = new URLSearchParams(location.search).get("proc");
+    if (proc) e.set({ proc: proc === "all" ? (PROCEDURES as any)[start]?.map((p: any) => p.id) ?? [] : proc.split(",") });
     e.switchAirport(start);
     const ro = new ResizeObserver(() => e.resize()); ro.observe(c);
     const onFs = () => setFs(!!document.fullscreenElement);

@@ -1,35 +1,15 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useRef } from "react";
 import { Logo } from "@/components/logo";
+import { Reveal, Label } from "@/components/reveal";
 
-// About: dark hero → light mission (fading back to dark into the image card) → what it does → track record.
-// Images are renders from the simulator itself (public/about). Organisations are named in text, not with their logos.
-
-// Fades its children up the first time they scroll into view (skipped when the visitor prefers reduced motion)
-function Reveal({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
-  const el = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const n = el.current!; if (matchMedia("(prefers-reduced-motion: reduce)").matches) { n.dataset.in = "1"; return; }
-    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { n.dataset.in = "1"; io.disconnect(); } }, { threshold: 0.15 });
-    io.observe(n); return () => io.disconnect();
-  }, []);
-  return <div ref={el} style={{ transitionDelay: `${delay}ms` }} className={`translate-y-6 opacity-0 transition duration-[900ms] ease-out motion-reduce:transition-none data-[in=1]:translate-y-0 data-[in=1]:opacity-100 ${className}`}>{children}</div>;
-}
-
-const Label = ({ children, dark }: { children: React.ReactNode; dark?: boolean }) => (
-  <p className={`flex items-center gap-2.5 font-mono text-[12px] tracking-[0.14em] ${dark ? "text-[#1d1f22]/70" : "text-white/55"}`}><span className="size-2 rounded-full bg-[#4f7dff]" />{children}</p>
-);
+// About: dark hero → light mission (fading back to dark into the image card) → what it does. Projects live on /project.
+// Images are renders from the simulator itself (public/about).
 
 const DOES = [
   ["See", "Every ICAO Annex 14 surface in 3D, over real terrain and buildings."],
   ["Compare", "Extend a runway, add a parallel one or overlay an instrument procedure, and watch the surfaces move."],
   ["Share", "One link, no installation. The same picture for everyone at the table."],
-];
-const RECORD = [
-  ["2017", "Incheon International Airport", "Phase 4 Basic and Detail Design", "IIAC project"],
-  ["2025", "Beira & Pemba Airports, Mozambique", "Modernisation Feasibility Study", "Korea Eximbank project"],
-  ["2026", "Papua New Guinea CADIP-II", "Master Plan", "Asian Development Bank project"],
 ];
 
 export default function About() {
@@ -81,30 +61,6 @@ export default function About() {
               </div>
             </Reveal>
           ))}
-        </div>
-      </section>
-
-      {/* ⑤ track record */}
-      <section className="px-[4.5vw] pb-32 max-md:px-5 max-md:pb-20">
-        <div className="grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-[6vw] max-lg:grid-cols-1 max-lg:gap-y-8">
-          <div>
-            <Reveal><Label>TRACK RECORD</Label></Reveal>
-            <Reveal delay={100}><p className="mt-6 max-w-[380px] text-[clamp(20px,1.8vw,26px)] leading-snug text-white/85">Built from the field — every feature comes from a real project.</p></Reveal>
-          </div>
-          <ol className="border-t border-white/10">
-            {RECORD.map(([y, name, scope, by], i) => (
-              <Reveal key={y} delay={i * 120}>
-                <li className="grid grid-cols-[110px_minmax(0,1fr)] gap-6 border-b border-white/10 py-8 max-md:grid-cols-1 max-md:gap-2 max-md:py-6">
-                  <span className="font-serif text-[44px] leading-none text-[#f3eee6] max-md:text-[34px]">{y}</span>
-                  <div>
-                    <div className="text-[19px] font-semibold text-white">{name}</div>
-                    <div className="mt-1 text-[16px] text-white/65">{scope}</div>
-                    <div className="mt-3 font-mono text-[11.5px] tracking-[0.12em] text-[#d8b48a] uppercase">{by}</div>
-                  </div>
-                </li>
-              </Reveal>
-            ))}
-          </ol>
         </div>
       </section>
 
