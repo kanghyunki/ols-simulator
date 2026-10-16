@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Logo } from "@/components/logo";
+import { SiteNav } from "@/components/site-nav";
 import { dialCodes, type Dial } from "@/data/dial-codes";
 import { supabase } from "@/lib/supabase";
 
@@ -87,9 +87,7 @@ export default function SignIn() {
   return (
     <div className="fixed inset-0 overflow-y-auto bg-[#050608] text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(70%_60%_at_100%_0%,rgba(180,138,92,.16),rgba(5,6,8,0)_70%)]" />
-      <header className="relative flex items-center px-[4.5vw] py-6 max-md:px-5 max-md:py-4">
-        <Link href="/" className="transition hover:text-white/80"><Logo /></Link>
-      </header>
+      <SiteNav />
 
       <main className="relative grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-[6vw] px-[4.5vw] pt-[6vh] pb-20 max-lg:grid-cols-1 max-md:px-5 max-md:pt-6">
         <section>

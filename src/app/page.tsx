@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/logo";
+import { SiteNav } from "@/components/site-nav";
 import { Landing, type FanMode } from "@/components/landing";
 import { Simulator } from "@/components/simulator";
 
@@ -50,19 +51,7 @@ export default function Page() {
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_80%_at_0%_100%,rgba(5,6,8,.92)_20%,rgba(5,6,8,0)_60%)] max-md:bg-[linear-gradient(to_top,rgba(5,6,8,.95)_35%,rgba(5,6,8,0)_70%)]" />
 
             <div className={`relative flex h-full flex-col transition-all duration-700 ${moving ? "translate-y-2 opacity-0" : ""}`}>
-              <header className="flex items-center gap-12 px-[4.5vw] py-6 max-lg:gap-8 max-md:px-5 max-md:py-4">
-                <Logo />
-                {/* ponytail: menu items have no pages yet — buttons with no action until those pages exist */}
-                <nav className="flex items-center gap-9 text-[15px] text-white/85 max-lg:gap-6 max-md:hidden">
-                  {["Product", "Project", "About", "Process", "Contact"].map((t) => t === "About" || t === "Product" || t === "Project"
-                    ? <Link key={t} href={`/${t.toLowerCase()}`} className="transition hover:text-white">{t}</Link>
-                    : <button key={t} type="button" className="transition hover:text-white">{t}</button>)}
-                </nav>
-                <div className="ml-auto flex items-center gap-6 text-[15px] max-md:gap-4">
-                  <Link href="/signin" className="text-white/80 transition hover:text-white max-md:hidden">Sign in</Link>
-                  <Link href="/demo" className="flex h-10 items-center rounded-md bg-white px-4 font-medium text-[#0b0d10] transition hover:bg-white/85 max-md:h-9 max-md:px-3 max-md:text-[14px]">Request demo</Link>
-                </div>
-              </header>
+              <SiteNav />
 
               <main className="mt-auto max-w-[760px] px-[4.5vw] pb-[9vh] max-md:px-5 max-md:pb-10">
                 <p className="mb-5 font-mono text-[12px] tracking-[0.14em] text-white/55 max-md:mb-3 max-md:text-[10.5px]">AIRPORT PLANNING · OBSTACLE LIMITATION SURFACES</p>

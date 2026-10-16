@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Logo } from "@/components/logo";
+import { SiteNav } from "@/components/site-nav";
 
 // Product: two products, one screen each. Each shows its screenshot in a device drawn in CSS (laptop or phone);
 // PREVIEW swaps to the other device with that device's screenshot. Shots: public/product, taken from the simulator.
@@ -72,9 +73,7 @@ function Product({ n, name, title, body, shots, href, start, flip, mark }: {
 export default function ProductPage() {
   return (
     <div className="fixed inset-0 overflow-x-hidden overflow-y-auto bg-[#050608] text-white">
-      <header className="flex items-center px-[4.5vw] py-6 max-md:px-5 max-md:py-4">
-        <Link href="/" className="transition hover:text-white/80"><Logo /></Link>
-      </header>
+      <SiteNav />
 
       <Product n="01" name="OLS Simulator" title="Every Annex 14 surface, in 3D."
         body="Approach, take-off, transitional, inner horizontal, conical and OFZ over real terrain and buildings for airport. Extend a runway or add a parallel one and watch the surfaces move."

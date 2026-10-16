@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
+import { SiteNav } from "@/components/site-nav";
 import { Reveal } from "@/components/reveal";
 
 // Project: the airport projects OLS Simulator grew out of. Organisations are named in text, not with their logos
@@ -15,9 +16,7 @@ export default function ProjectPage() {
   return (
     <div className="fixed inset-0 overflow-x-hidden overflow-y-auto bg-[#050608] text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(70%_60%_at_100%_0%,rgba(180,138,92,.14),rgba(5,6,8,0)_70%)]" />
-      <header className="relative flex items-center px-[4.5vw] py-6 max-md:px-5 max-md:py-4">
-        <Link href="/" className="transition hover:text-white/80"><Logo /></Link>
-      </header>
+      <SiteNav />
 
       <section className="relative min-h-[calc(100svh-80px)] px-[4.5vw] pt-[12vh] pb-32 max-md:px-5 max-md:pt-10 max-md:pb-20">
         <div className="grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-[6vw] max-lg:grid-cols-1 max-lg:gap-y-10">

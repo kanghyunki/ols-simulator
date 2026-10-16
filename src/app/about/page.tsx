@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
+import { SiteNav } from "@/components/site-nav";
 import { Reveal, Label } from "@/components/reveal";
 
 // About: dark hero → light mission (fading back to dark into the image card) → what it does. Projects live on /project.
@@ -20,9 +21,7 @@ export default function About() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/about/goroka.jpg" alt="" className="absolute inset-0 size-full scale-105 object-cover opacity-70" />
         <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(5,6,8,.95)_10%,rgba(5,6,8,.35)_55%,rgba(5,6,8,.6)_100%),radial-gradient(90%_70%_at_0%_100%,rgba(5,6,8,.9),rgba(5,6,8,0)_70%)]" />
-        <header className="relative flex items-center px-[4.5vw] py-6 max-md:px-5 max-md:py-4">
-          <Link href="/" className="transition hover:text-white/80"><Logo /></Link>
-        </header>
+        <SiteNav />
         <div className="absolute inset-x-0 bottom-0 px-[4.5vw] pb-[11vh] max-md:px-5 max-md:pb-14">
           <Reveal><p className="mb-5 font-mono text-[12px] tracking-[0.14em] text-white/55">ABOUT</p></Reveal>
           <Reveal delay={100}><h1 className="max-w-[900px] font-serif text-[clamp(46px,7vw,108px)] leading-[0.95] text-[#f3eee6]">The Line in the Aerospace</h1></Reveal>
