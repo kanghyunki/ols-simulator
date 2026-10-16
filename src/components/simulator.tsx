@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -26,6 +26,28 @@ function H({ children }: { children: React.ReactNode }) { return <div className=
 function Note({ children }: { children: React.ReactNode }) { return <p className="mt-1.5 max-w-[250px] text-[10.5px] leading-snug text-white/40">{children}</p>; }
 const fmt = (v: number, d = 1) => v.toFixed(d);
 
+// One level of the Region → Country → Airport picker: a short scrolling list that keeps its selection in view
+function Column({ label, items, value, onPick, empty, rows }: { label: string; items: [string, string][]; value: string; onPick: (k: string) => void; empty?: string; rows: string }) {
+  const list = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {   // also when the list first gets a size (the mobile sheet opens after mount)
+    const box = list.current; if (!box) return;
+    const centre = () => { const el = box.querySelector<HTMLElement>("[aria-selected=true]"); if (el) box.scrollTop = Math.max(0, el.offsetTop - box.clientHeight / 2 + el.clientHeight / 2); };
+    centre(); const ro = new ResizeObserver(centre); ro.observe(box); return () => ro.disconnect();
+  }, [value, items.length]);
+  return (
+    <div className="min-w-0">
+      <div className="mb-1.5 text-[12px] font-semibold text-white/85">{label}</div>
+      <div ref={list} role="listbox" aria-label={label} className={`${rows} relative overflow-y-auto rounded-md border border-white/10 bg-[#0b0d10]/60 p-1 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,.2)_transparent]`}>
+        {items.map(([k, t]) => (
+          <button key={k} type="button" role="option" aria-selected={k === value} onClick={() => onPick(k)}
+            className={`block w-full truncate rounded px-2.5 py-1.5 text-left text-[12.5px] transition ${k === value ? "bg-white/15 font-semibold text-white" : "text-white/65 hover:bg-white/[.06] hover:text-white"}`}>{t}</button>
+        ))}
+        {!items.length && <div className="px-2.5 py-1.5 text-[12px] text-white/35">{empty}</div>}
+      </div>
+    </div>
+  );
+}
+
 export function Simulator({ onHome }: { onHome: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const eng = useRef<Engine | null>(null);
@@ -36,6 +58,9 @@ export function Simulator({ onHome }: { onHome: () => void }) {
   const [sel, setSel] = useState<Set<string>>(new Set());   // runway ends picked for extension (while still at 0 m)
   const [fs, setFs] = useState(false);
   const [menu, setMenu] = useState(false);   // mobile only: controls shown as a bottom sheet
+  // Top picker: folded to one line; unfolds on hover / focus / click, folds again once an airport is picked
+  // (hold keeps it folded under the pointer until the pointer leaves)
+  const [pickOpen, setPickOpen] = useState(false), [pickHold, setPickHold] = useState(false);
 
   useEffect(() => {
     const c = canvas.current!;
@@ -58,6 +83,14 @@ export function Simulator({ onHome }: { onHome: () => void }) {
   const surf = new Set<string>(st?.surf ?? ALL_KEYS);
   const surfaces = st?.ofz ? [...SURFACES, ...OFZ_SURFACES] : SURFACES;
   const airports = Object.entries(AIRPORTS as Record<string, any>).filter(([, a]) => a.region === region && countryOf(a) === country);
+  const picker = (rows: string, picked?: () => void) => <>
+    <Column label="Region" rows={rows} items={REGIONS as [string, string][]} value={region} onPick={(v) => { setRegion(v); setCountry(regionCountries(v)[0]); }} />
+    <Column label="Country" rows={rows} items={regionCountries(region).map((c) => [c, COUNTRY[c] ?? c])} value={country} onPick={setCountry} empty="No airports yet" />
+    <Column label="Airport" rows={rows} items={airports.map(([k, a]) => [k, a.sub.split(" · ")[1] ?? k])} value={snap?.apId ?? ""} onPick={(k) => { eng.current?.switchAirport(k); picked?.(); }} />
+  </>;
+  const cur = snap?.apId ? (AIRPORTS as any)[snap.apId] : null;
+  const fold = () => { setPickOpen(false); setPickHold(false); if (cur) { setRegion(cur.region); setCountry(countryOf(cur)); } };   // back to the airport on show
+  const unfolded = pickOpen && !pickHold;
 
   return (
     <div className="fixed inset-0 bg-[#0b0d10] font-sans text-white/80 select-none">
@@ -77,6 +110,24 @@ export function Simulator({ onHome }: { onHome: () => void }) {
         </span>
       </div>
 
+      {/* airport picker, top centre on wide screens (inside the left panel below 1280 px) */}
+      <div className="absolute top-3 left-1/2 w-[600px] -translate-x-1/2 rounded-xl border border-white/10 bg-[#0b0d10]/70 p-2.5 backdrop-blur max-xl:hidden"
+        onMouseEnter={() => setPickOpen(true)} onMouseLeave={fold}
+        onFocus={() => setPickOpen(true)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) fold(); }}>
+        <button type="button" aria-expanded={unfolded} onClick={() => (unfolded ? fold() : (setPickHold(false), setPickOpen(true)))}
+          className="flex h-7 w-full items-center gap-2 px-1.5 text-[12.5px] text-white/60">
+          {cur ? <>
+            <span>{REGIONS.find(([k]) => k === cur.region)?.[1]}</span><span className="text-white/30">›</span>
+            <span>{COUNTRY[countryOf(cur)] ?? countryOf(cur)}</span><span className="text-white/30">›</span>
+            <span className="font-semibold text-white">{cur.sub.split(" · ")[1]}</span>
+          </> : <span>Choose an airport</span>}
+          <svg viewBox="0 0 20 20" className={`ml-auto size-4 transition-transform ${unfolded ? "rotate-180" : ""}`} aria-hidden><path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>
+        </button>
+        <div className={`grid grid-cols-3 gap-3 overflow-hidden transition-all duration-300 ${unfolded ? "mt-2 max-h-[200px] opacity-100" : "max-h-0 opacity-0"}`}>
+          {picker("h-[132px]", () => setPickHold(true))}
+        </div>
+      </div>
+
       {/* left panel */}
       <div className={`absolute top-14 bottom-10 left-7 w-[270px] overflow-y-auto pr-2 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,.15)_transparent] max-md:inset-x-0 max-md:top-auto max-md:bottom-6 max-md:w-auto max-md:max-h-[50vh] max-md:rounded-t-2xl max-md:bg-[#0b0d10]/90 max-md:px-4 max-md:pt-3 max-md:pb-4 max-md:backdrop-blur ${menu ? "" : "max-md:hidden"}`}>
         <H>View</H>
@@ -87,21 +138,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
           <Toggle size="sm" className={pill} pressed={!!st?.rot} onPressedChange={(v) => set({ rot: v })}>Auto-rotate</Toggle>
         </div>
 
-        <H>Region</H>
-        <ToggleGroup type="single" value={region} onValueChange={(v) => { if (!v) return; setRegion(v); setCountry(regionCountries(v)[0]); }} className="flex-wrap gap-1.5">
-          {REGIONS.map(([k, label]) => <ToggleGroupItem key={k} value={k} size="sm" className={pill}>{label}</ToggleGroupItem>)}
-        </ToggleGroup>
-
-        <H>Country</H>
-        <ToggleGroup type="single" value={country} onValueChange={(v) => v && setCountry(v)} className="flex-wrap gap-1.5">
-          {regionCountries(region).map((c) => <ToggleGroupItem key={c} value={c} size="sm" className={pill}>{COUNTRY[c] ?? c}</ToggleGroupItem>)}
-        </ToggleGroup>
-        {!regionCountries(region).length && <Note>No airports in this region yet.</Note>}
-
-        <H>Airport</H>
-        <ToggleGroup type="single" value={snap?.apId ?? ""} onValueChange={(v) => v && eng.current?.switchAirport(v)} className="flex-wrap gap-1.5">
-          {airports.map(([k, a]) => <ToggleGroupItem key={k} value={k} size="sm" className={pill} title={a.sub}>{a.sub.split(" · ")[1] ?? k}</ToggleGroupItem>)}
-        </ToggleGroup>
+        <div className="mt-5 grid gap-3 xl:hidden">{picker("h-[104px]")}</div>
         {snap?.loading && <Note>Loading airport data…</Note>}
         {snap?.failed && <Note>Could not load the airport data (network).</Note>}
         {ap && <Note>{ap.sub} · AD {ap.E} m AMSL · Annex 14 code {ap.code} · terrain {ap.dem === "ok" ? "loaded" : ap.dem === "loading" ? "loading…" : ap.dem === "failed" ? "unavailable" : "none"}</Note>}
