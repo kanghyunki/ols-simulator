@@ -16,6 +16,9 @@ type Snap = any;
 type Hover = any;
 
 const pill = "h-6 rounded-full border border-white/10 bg-white/10 px-2.5 text-[11.5px] font-medium text-white/80 hover:bg-white/20 hover:text-white data-[state=on]:border-white/40 data-[state=on]:bg-white/25 data-[state=on]:text-white";
+// Panel lists: an "All" toggle on its own line, then the items two per row in equal columns
+const grid2 = "mt-1.5 grid grid-cols-2 gap-1.5";
+const cell = `${pill} w-full min-w-0 justify-start`;
 const hex = (c: number) => "#" + c.toString(16).padStart(6, "0");
 // Country = last segment of the registry's `sub` ("AYPY · Jacksons Intl · PNG"); long names for the buttons
 const countryOf = (a: any): string => a.sub.split(" · ").pop();
@@ -167,7 +170,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
       </div>
 
       {/* left panel */}
-      <div className={`absolute top-14 bottom-10 left-7 w-[270px] overflow-y-auto pr-2 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,.15)_transparent] max-md:inset-x-0 max-md:top-auto max-md:bottom-6 max-md:w-auto max-md:max-h-[50vh] max-md:rounded-t-2xl max-md:bg-[#0b0d10]/90 max-md:px-4 max-md:pt-3 max-md:pb-4 max-md:backdrop-blur ${menu ? "" : "max-md:hidden"}`}>
+      <div className={`absolute top-14 bottom-10 left-7 w-[310px] overflow-y-auto pr-2 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,.15)_transparent] max-md:inset-x-0 max-md:top-auto max-md:bottom-6 max-md:w-auto max-md:max-h-[50vh] max-md:rounded-t-2xl max-md:bg-[#0b0d10]/90 max-md:px-4 max-md:pt-3 max-md:pb-4 max-md:backdrop-blur ${menu ? "" : "max-md:hidden"}`}>
         <H>{t("View", "보기")}</H>
         <div className="flex flex-wrap gap-1.5">
           <Button size="xs" className={pill} onClick={() => eng.current?.fit("all")}>{t("Overview", "전체")}</Button>
@@ -184,22 +187,22 @@ export function Simulator({ onHome }: { onHome: () => void }) {
         {ap && (
           <>
             <H>{t("Runways", "활주로")}</H>
-            <div className="flex flex-wrap gap-1.5">
-              <Toggle size="sm" className={pill} pressed={ap.rwys.every((r: any) => r.on)} onPressedChange={() => ap.rwys.forEach((_: any, i: number) => eng.current?.setRunway(i, true))}>{t("All runways", "전체 활주로")}</Toggle>
-              {ap.rwys.map((r: any, i: number) => <Toggle key={r.id} size="sm" className={pill} pressed={r.on} onPressedChange={(v) => eng.current?.setRunway(i, v)}>RWY {r.id} <span className="font-mono text-[10px] text-white/45">{r.len.toLocaleString("en")}m</span></Toggle>)}
+            <Toggle size="sm" className={pill} pressed={ap.rwys.every((r: any) => r.on)} onPressedChange={() => ap.rwys.forEach((_: any, i: number) => eng.current?.setRunway(i, true))}>{t("All runways", "전체 활주로")}</Toggle>
+            <div className={grid2}>
+              {ap.rwys.map((r: any, i: number) => <Toggle key={r.id} size="sm" className={cell} pressed={r.on} onPressedChange={(v) => eng.current?.setRunway(i, v)}><span className="truncate">{r.id}</span> <span className="ml-auto font-mono text-[10px] text-white/45">{r.len.toLocaleString("en")}m</span></Toggle>)}
             </div>
           </>
         )}
 
         <H>{t("Obstacle surfaces", "장애물제한표면")}</H>
-        <div className="flex flex-wrap gap-1.5">
-          <Toggle size="sm" className={pill} pressed={surf.size === surfaces.length} onPressedChange={() => set({ surf: ALL_KEYS })}>{t("All", "전체")}</Toggle>
+        <Toggle size="sm" className={pill} pressed={surf.size === surfaces.length} onPressedChange={() => set({ surf: ALL_KEYS })}>{t("All", "전체")}</Toggle>
+        <div className={grid2}>
           {surfaces.map(([k, label, c]) => (
-            <span key={k} className="inline-flex items-center gap-1">
-              <Toggle size="sm" className={pill} pressed={surf.has(k)} onPressedChange={(v) => { const s = new Set(surf); if (v) s.add(k); else s.delete(k); set({ surf: [...s] }); }}>
-                <span className="size-1.5 rounded-full" style={{ background: hex(c) }} />{sn(label)}
+            <span key={k} className="flex min-w-0 items-center gap-1">
+              <Toggle size="sm" className={`${cell} flex-1`} pressed={surf.has(k)} onPressedChange={(v) => { const s = new Set(surf); if (v) s.add(k); else s.delete(k); set({ surf: [...s] }); }}>
+                <span className="size-1.5 shrink-0 rounded-full" style={{ background: hex(c) }} /><span className="truncate">{sn(label)}</span>
               </Toggle>
-              <button className="text-[10px] text-white/35 hover:text-white/80" onClick={() => set({ surf: [k] })}>{t("only", "만 보기")}</button>
+              <button className="shrink-0 text-[10px] text-white/35 hover:text-white/80" onClick={() => set({ surf: [k] })}>{t("only", "만 보기")}</button>
             </span>
           ))}
         </div>
@@ -207,7 +210,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
 
         {ap && st && (
           <>
-            <H>{t("Scenario", "시나리오")}</H>
+            <H>{t("Scenario", "계획하기")}</H>
             {ap.rwys.map((r: any, i: number) => {
               const total = r.len + (st.extA[i] || 0) + (st.extB[i] || 0);
               return (
@@ -229,9 +232,9 @@ export function Simulator({ onHome }: { onHome: () => void }) {
                 </div>
               ); })}
             <div className="mb-2">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="w-[92px] text-[11px] text-white/45">{t("Parallel", "평행활주로")}</span>
-                {ap.rwys.map((r: any, i: number) => <Button key={r.id} size="xs" className={pill} onClick={() => set({ par: [...st.par, { ri: i, off: 760, len: 0 }] })}>+ ∥ {r.id}</Button>)}
+              <div className="mt-3 text-[11px] text-white/45">{t("Parallel", "평행활주로")}</div>
+              <div className={grid2}>
+                {ap.rwys.map((r: any, i: number) => <Button key={r.id} size="xs" className={cell} onClick={() => set({ par: [...st.par, { ri: i, off: 760, len: 0 }] })}><span className="truncate">+ ∥ {r.id}</span></Button>)}
               </div>
               {(st.par as { ri: number; off: number; len: number }[]).map((p, k) => { const upd = (q: Partial<typeof p>) => set({ par: st.par.map((r: any, j: number) => (j === k ? { ...r, ...q } : r)) });
                 const sp = Math.abs(p.off), side = p.off < 0 ? "R" : "L", len = p.len || ap.rwys[p.ri].len;
@@ -269,11 +272,11 @@ export function Simulator({ onHome }: { onHome: () => void }) {
         {!!ap?.procs?.length && (
           <>
             <H>{t("Flight procedures", "비행절차")}</H>
-            <div className="flex flex-wrap gap-1.5">
-              <Toggle size="sm" className={pill} pressed={ap.procs.every((p: any) => st?.proc?.includes(p.id))} onPressedChange={(v) => set({ proc: v ? ap.procs.map((p: any) => p.id) : [] })}>{t("All", "전체")}</Toggle>
+            <Toggle size="sm" className={pill} pressed={ap.procs.every((p: any) => st?.proc?.includes(p.id))} onPressedChange={(v) => set({ proc: v ? ap.procs.map((p: any) => p.id) : [] })}>{t("All", "전체")}</Toggle>
+            <div className={grid2}>
               {ap.procs.map((p: any) => (
-                <Toggle key={p.id} size="sm" className={pill} pressed={!!st?.proc?.includes(p.id)} onPressedChange={(v) => set({ proc: v ? [...(st?.proc ?? []), p.id] : (st?.proc ?? []).filter((x: string) => x !== p.id) })}>
-                  <span className="size-1.5 rounded-full" style={{ background: hex(p.color) }} />{p.name}
+                <Toggle key={p.id} size="sm" className={cell} pressed={!!st?.proc?.includes(p.id)} onPressedChange={(v) => set({ proc: v ? [...(st?.proc ?? []), p.id] : (st?.proc ?? []).filter((x: string) => x !== p.id) })}>
+                  <span className="size-1.5 shrink-0 rounded-full" style={{ background: hex(p.color) }} /><span className="truncate">{p.name}</span>
                 </Toggle>
               ))}
             </div>
