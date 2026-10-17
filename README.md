@@ -9,16 +9,19 @@ ICAO Annex 14 장애물제한표면(OLS)을 실제 지형·건물 위에 3D로 �
 
 ## 시연 시나리오 (효과 자기신고서 3번과 동일)
 
+화면은 영어·한국어 두 가지입니다. 브라우저 언어가 한국어면 한국어로 열리고, 오른쪽 위 🌐 버튼으로 바꿀 수 있습니다.
+아래 표는 버튼 이름을 **영어(한국어)** 로 함께 적었습니다.
+
 | 단계 | 조작 | 기대 결과 |
 |---|---|---|
-| ① | https://ols-simulator.vercel.app 접속 → **Explore** 클릭 | 랜딩 화면에서 시뮬레이터로 전환 |
-| ② | 화면 위쪽 선택 바(Region › Country › Airport)에서 **Oceania › Papua New Guinea › Jacksons Intl** | OLS 표면이 지형(GEDTM30)·OSM 건물과 함께 3D로 표시. 기본 6개(착륙대·진입·이륙상승·전이·내부수평·원추), 왼쪽 **Check › OFZ**를 켜면 OFZ 3개(내부진입·내부전이·착륙복행)까지 9개 |
-| ③ | 왼쪽 패널 **Scenario**에서 RWY 14L/32R의 **14L** 클릭 → 슬라이더로 **+500 m** | 활주로 길이 **2750 → 3250 m**, 연장된 진입·이륙상승표면이 바깥쪽으로 이동 |
-| ④ | **Existing** 켜고 지표면에 마우스 올리기 | 기존 OLS(주황)와 비교, 오른쪽 **Altitude**에 제한고 표시. 내부수평표면 = 공항표고 39 m + 45 m = **84 m** |
+| ① | https://ols-simulator.vercel.app 접속 → **Explore(시작하기)** 클릭 | 랜딩 화면에서 시뮬레이터로 전환 |
+| ② | 화면 위쪽 선택 바(Region › Country › Airport / 지역 › 국가 › 공항)에서 **Oceania › Papua New Guinea › Jacksons Intl** (오세아니아 › 파푸아뉴기니 › Jacksons Intl) | OLS 표면이 지형(GEDTM30)·OSM 건물과 함께 3D로 표시. 기본 6개(착륙대·진입·이륙상승·전이·내부수평·원추), 왼쪽 **Check › OFZ (검토 › OFZ)** 를 켜면 OFZ 3개(내부진입·내부전이·착륙복행)까지 9개 |
+| ③ | 왼쪽 패널 **Scenario(시나리오)** 에서 RWY 14L/32R의 **14L** 클릭 → 슬라이더로 **+500 m** | 활주로 길이 **2750 → 3250 m**, 연장된 진입·이륙상승표면이 바깥쪽으로 이동 |
+| ④ | **Existing(기존 OLS 비교)** 켜고 지표면에 마우스 올리기 | 기존 OLS(주황)와 비교, 오른쪽 **Altitude(고도)** 에 제한고 표시. 내부수평표면 = 공항표고 39 m + 45 m = **84 m** |
 
 - 허용 편차: 표면 제한고는 Annex 14 수기 계산 대비 ±0.5 m. 지형고는 GEDTM30 원자료 정확도(수 m) 범위.
-- 화면 폭이 1280 px 미만(노트북 일부·휴대폰)이면 선택 바가 왼쪽 패널(휴대폰은 **Controls**) 안에 있습니다.
-- 제출 이후 바뀐 점: 사이트 첫 화면에 랜딩 페이지가 추가되어 **Explore**를 한 번 더 누릅니다(①). 공항 선택은 왼쪽 버튼에서 위쪽 선택 바로 옮겨졌습니다(②).
+- 화면 폭이 1280 px 미만(노트북 일부·휴대폰)이면 선택 바가 왼쪽 패널(휴대폰은 **Controls(메뉴)**) 안에 있습니다.
+- 제출 이후 바뀐 점: 사이트 첫 화면에 랜딩 페이지가 추가되어 **Explore(시작하기)** 를 한 번 더 누릅니다(①). 공항 선택은 왼쪽 버튼에서 위쪽 선택 바로 옮겨졌습니다(②).
 
 ## 내 PC에서 실행
 
@@ -43,6 +46,7 @@ npm run dev
 | 공항 레지스트리(37개 공항: 활주로 시단 좌표·표고, 가정값 안내) | `src/data/airports.js` |
 | 공항별 OSM 활주로·건물·도로 데이터 / 지형 격자 | `public/data/osm_*.js`, `public/dem/*.bin` |
 | 랜딩·Product·Project·About·Contact·Log in·Sign up 페이지 | `src/app/` |
+| 영어/한국어 전환(🌐 버튼, 브라우저 언어 따라감·선택 기억) | `src/lib/lang.ts`, `src/components/lang-button.tsx` |
 
 공항 데이터(`airports.js`, `public/data`, `public/dem`)는 별도 저장소(cadip-web)의 `tools/ols` 스크립트로
 OpenStreetMap(Overpass)·GEDTM30에서 생성했습니다.
