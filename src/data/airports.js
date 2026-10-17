@@ -167,13 +167,13 @@ const AIRPORTS={
     name:'인천', sub:'RKSI · Incheon Intl · Korea', region:'NEA', E:7.0,
     osm:null, dem:null,
     rwys:[ // THR 좌표·표고: AIP 대한민국 RKSI AD 2.12 (AMDT 08/2026, WEF 20 AUG 2026)
-      {id:'R1 15L/33R', nameA:'15L', nameB:'33R', len:3750,
-       llA:[37+29/60+ 2.20/3600, 126+26/60+24.56/3600], llB:[37+27/60+22.97/3600, 126+27/60+52.82/3600], eA:6.9, eB:6.9, cwyA:300, cwyB:300},
-      {id:'R2 15R/33L', nameA:'15R', nameB:'33L', len:3750,
+      {id:'1 15R/33L', nameA:'15R', nameB:'33L', len:3750,
        llA:[37+28/60+54.44/3600, 126+26/60+10.82/3600], llB:[37+27/60+15.21/3600, 126+27/60+39.08/3600], eA:6.9, eB:6.9, cwyA:300, cwyB:300},
-      {id:'R3 16L/34R', nameA:'16L', nameB:'34R', len:4000,
+      {id:'2 15L/33R', nameA:'15L', nameB:'33R', len:3750,
+       llA:[37+29/60+ 2.20/3600, 126+26/60+24.56/3600], llB:[37+27/60+22.97/3600, 126+27/60+52.82/3600], eA:6.9, eB:6.9, cwyA:300, cwyB:300},
+      {id:'3 16L/34R', nameA:'16L', nameB:'34R', len:4000,
        llA:[37+28/60+22.11/3600, 126+24/60+56.06/3600], llB:[37+26/60+36.29/3600, 126+26/60+30.22/3600], eA:7.0, eB:7.0, cwyA:300, cwyB:300},
-      {id:'R4 16R/34L', nameA:'16R', nameB:'34L', len:3750,
+      {id:'4 16R/34L', nameA:'16R', nameB:'34L', len:3750,
        llA:[37+28/60+ 7.71/3600, 126+24/60+48.18/3600], llB:[37+26/60+28.50/3600, 126+26/60+16.45/3600], eA:7.0, eB:7.0, cwyA:300, cwyB:300}
     ],
     bgRwy:[],
@@ -182,7 +182,7 @@ const AIRPORTS={
     assume:'· 시단 좌표·표고(15L/R·33L/R 6.9m, 16L/R·34L/R 7.0m), AD 표고 7m, 활주로 3750/3750/4000/3750×60m: <b>AIP 대한민국 RKSI AD 2 (AMDT 08/2026, WEF 20 AUG 2026)</b>.<br>'
       +'· CWY 300m 적용(AD 2.13 TODA−TORA=300m 전 활주로 동일), SWY 120m(ASDA−TORA).<br>'
       +'· 지형: 온라인 <b>AWS Terrain Tiles</b>(terrarium, ~30m)를 접속 시 자동 로드해 지형 저촉 검토에 사용 — 오프라인이면 지형 검토 없이 동작. 건물은 OSM height/levels 태그 보유분만.<br>'
-      +'· 전 활주로 CAT III 정밀 → OLS 제원은 Tab.4-1 Code 4 (CAT I과 동일), OFZ 옵션. 활주로 순번(R1–R4)은 편의상 표기.'
+      +'· 전 활주로 CAT III 정밀 → OLS 제원은 Tab.4-1 Code 4 (CAT I과 동일), OFZ 옵션. 활주로 번호는 인천공항 순번: 제1 15R/33L, 제2 15L/33R, 제3 16L/34R, 제4 16R/34L.'
   },
   // 한국 14개 공항 — 시단 좌표·표고·CWY: AIP 대한민국 eAIP 2026-09-17 패키지(aim.koca.go.kr) AD 2.2/2.12/2.13
   RKSS:{

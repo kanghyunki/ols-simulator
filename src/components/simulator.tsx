@@ -152,7 +152,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
             <H>Runways</H>
             <div className="flex flex-wrap gap-1.5">
               <Toggle size="sm" className={pill} pressed={ap.rwys.every((r: any) => r.on)} onPressedChange={() => ap.rwys.forEach((_: any, i: number) => eng.current?.setRunway(i, true))}>All runways</Toggle>
-              {ap.rwys.map((r: any, i: number) => <Toggle key={r.id} size="sm" className={pill} pressed={r.on} onPressedChange={(v) => eng.current?.setRunway(i, v)}>RWY {r.id} <span className="font-mono text-[10px] text-white/45">{r.len} m</span></Toggle>)}
+              {ap.rwys.map((r: any, i: number) => <Toggle key={r.id} size="sm" className={pill} pressed={r.on} onPressedChange={(v) => eng.current?.setRunway(i, v)}>RWY {r.id} <span className="font-mono text-[10px] text-white/45">{r.len.toLocaleString("en")}m</span></Toggle>)}
             </div>
           </>
         )}
