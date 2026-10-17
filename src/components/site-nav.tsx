@@ -4,8 +4,8 @@ import { usePathname } from "next/navigation";
 import { Logo } from "@/components/logo";
 
 // The landing page's top bar, shared by every page so it stays put while moving between them; the current page is lit.
-// ponytail: Process and Contact have no pages yet — buttons with no action until those pages exist
-const ITEMS: [string, string | null][] = [["Product", "/product"], ["Project", "/project"], ["About", "/about"], ["Process", null], ["Contact", null]];
+// ponytail: Process has no page yet — a button with no action until it exists
+const ITEMS: [string, string | null][] = [["Product", "/product"], ["Project", "/project"], ["About", "/about"], ["Process", null], ["Contact", "/contact"]];
 
 export function SiteNav() {
   const path = usePathname();
@@ -20,7 +20,7 @@ export function SiteNav() {
       </nav>
       <div className="ml-auto flex items-center gap-6 text-[15px] max-md:gap-4">
         <Link href="/signin" aria-current={path === "/signin" ? "page" : undefined} className={`transition hover:text-white max-md:hidden ${path === "/signin" ? "text-white" : "text-white/80"}`}>Sign in</Link>
-        <Link href="/demo" className="flex h-10 items-center rounded-md bg-white px-4 font-medium text-[#0b0d10] transition hover:bg-white/85 max-md:h-9 max-md:px-3 max-md:text-[14px]">Request demo</Link>
+        <Link href="/login" className="flex h-10 items-center rounded-md bg-white px-4 font-medium text-[#0b0d10] transition hover:bg-white/85 max-md:h-9 max-md:px-3 max-md:text-[14px]">Log in</Link>
       </div>
     </header>
   );

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { SiteNav } from "@/components/site-nav";
 
-// Request a demo. No backend: sending opens the visitor's mail app with the brief filled in.
+// Contact (formerly /demo, which redirects here): request a demo. No backend: sending opens the visitor's mail app with the brief filled in.
 const TO = "";   // recipient address — set before going live
 const SECTORS = ["Airport operator", "Civil aviation authority", "Engineering / consultancy", "Government / public sector", "Academia", "Other"];
 const EXPLORE = ["OLS Simulator", "Flight Procedure"];
@@ -12,7 +12,7 @@ const field = "w-full rounded-md border border-white/12 bg-white/[.04] px-4 text
 const select = `${field} h-14 appearance-none pr-12`;
 const Chevron = () => <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-4 bottom-[19px] size-[18px] text-white/60" aria-hidden><path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>;
 
-export default function Demo() {
+export default function Contact() {
   const [f, setF] = useState({ name: "", email: "", company: "", sector: "", explore: EXPLORE[0], context: "" });
   const [sent, setSent] = useState(false);
   const up = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
@@ -32,7 +32,7 @@ export default function Demo() {
 
       <main className="relative grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-[6vw] px-[4.5vw] pt-[6vh] pb-20 max-lg:grid-cols-1 max-md:px-5 max-md:pt-6">
         <section>
-          <p className="mb-6 font-mono text-[12px] tracking-[0.14em] text-white/55">REQUEST A DEMO</p>
+          <p className="mb-6 font-mono text-[12px] tracking-[0.14em] text-white/55">CONTACT</p>
           <h1 className="font-serif text-[clamp(48px,6.2vw,96px)] leading-[0.95] text-[#f3eee6]">What are you<br />looking to solve?</h1>
           <p className="mt-8 max-w-[520px] text-[clamp(16px,1.3vw,19px)] leading-relaxed text-white/70 max-lg:mb-12">
             Whether you are reviewing the obstacle surfaces of an existing airport, planning a runway extension or checking an instrument procedure, tell us a little about your project.

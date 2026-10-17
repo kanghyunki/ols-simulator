@@ -121,7 +121,7 @@ export default function SignIn() {
               {busy ? "SIGNING IN…" : "SIGN IN"}
             </button>
             <p role="status" className={`mt-5 text-[15px] ${msg ? (msg.ok ? "text-[#6fcf8a]" : "text-[#f0625c]") : "text-white/60"}`}>
-              {msg ? msg.text : <>Questions first? <Link href="/demo" className="text-white/85 underline-offset-4 hover:underline">Request a demo</Link></>}
+              {msg ? msg.text : <>Questions first? <Link href="/contact" className="text-white/85 underline-offset-4 hover:underline">Contact us</Link></>}
             </p>
           </div>
         </form>

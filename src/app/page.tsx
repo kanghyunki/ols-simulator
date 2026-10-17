@@ -93,7 +93,7 @@ export default function Page() {
               ))}
               <div>
                 <div className="mb-5 text-[12px] tracking-[0.08em] text-white/45 uppercase">Contact</div>
-                <Link href="/demo" className="text-white/80 transition hover:text-white">Request a demo</Link>
+                <Link href="/contact" className="text-white/80 transition hover:text-white">Request a demo</Link>
               </div>
             </div>
             <div className="mt-16 flex items-center justify-between border-t border-white/[.07] pt-6 text-[12.5px] text-white/40">
