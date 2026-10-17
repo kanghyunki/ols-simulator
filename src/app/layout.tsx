@@ -9,6 +9,9 @@ const mono = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"], 
 export const metadata: Metadata = {
   title: "OLS Simulator · 3D Design Simulation",
   description: "Obstacle limitation surfaces over real terrain and buildings, runway scenarios and instrument procedures.",
+  // Link previews (KakaoTalk etc.) show the title in bold with the description underneath: two lines
+  openGraph: { title: "안녕하세요 OLS 시뮬레이터입니다", description: "여기를 눌러 경험해보세요" },
+  twitter: { card: "summary_large_image", title: "안녕하세요 OLS 시뮬레이터입니다", description: "여기를 눌러 경험해보세요" },
 };
 export const viewport = { themeColor: "#0b0d10" };
 

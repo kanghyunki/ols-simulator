@@ -92,6 +92,23 @@ export function Simulator({ onHome }: { onHome: () => void }) {
     <Column label="Country" rows={rows} items={regionCountries(region).map((c) => [c, COUNTRY[c] ?? c])} value={country} onPick={setCountry} empty="No airports yet" />
     <Column label="Airport" rows={rows} items={airports.map(([k, a]) => [k, a.sub.split(" · ")[1] ?? k])} value={snap?.apId ?? ""} onPick={(k) => { eng.current?.switchAirport(k); picked?.(); }} />
   </>;
+  // Ground imagery and vertical exaggeration: bottom right above the coordinates on wider screens, in the Controls sheet on phones
+  const groundVertical = <>
+    <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
+      <span className="mr-1 text-[11px] text-white/45">Ground</span>
+      <ToggleGroup type="single" value={st?.base ?? "sat"} onValueChange={(v) => v && set({ base: v })} className="gap-1.5">
+        <ToggleGroupItem value="sat" size="sm" className={pill}>Satellite</ToggleGroupItem>
+        <ToggleGroupItem value="osm" size="sm" className={pill}>OSM</ToggleGroupItem>
+        <ToggleGroupItem value="none" size="sm" className={pill}>None</ToggleGroupItem>
+      </ToggleGroup>
+    </div>
+    <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
+      <span className="mr-1 text-[11px] text-white/45">Vertical</span>
+      <ToggleGroup type="single" value={String(st?.zex ?? 1)} onValueChange={(v) => v && set({ zex: +v })} className="gap-1.5">
+        {[1, 2, 5, 10].map((z) => <ToggleGroupItem key={z} value={String(z)} size="sm" className={pill}>{z}×</ToggleGroupItem>)}
+      </ToggleGroup>
+    </div>
+  </>;
   const cur = snap?.apId ? (AIRPORTS as any)[snap.apId] : null;
   const fold = () => { setPickOpen(false); setPickHold(false); if (cur) { setRegion(cur.region); setCountry(countryOf(cur)); } };   // back to the airport on show
   const unfolded = pickOpen && !pickHold;
@@ -251,20 +268,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
           <Toggle size="sm" className={pill} pressed={!!st?.pen} onPressedChange={(v) => set({ pen: v })}><span className="size-1.5 rounded-full bg-[#c64545]" />Terrain through them</Toggle>
           <Toggle size="sm" className={pill} pressed={!!st?.ofz} onPressedChange={(v) => set({ ofz: v })}>OFZ (inner surfaces)</Toggle>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-[11px] text-white/45">Ground</span>
-          <ToggleGroup type="single" value={st?.base ?? "sat"} onValueChange={(v) => v && set({ base: v })} className="gap-1.5">
-            <ToggleGroupItem value="sat" size="sm" className={pill}>Satellite</ToggleGroupItem>
-            <ToggleGroupItem value="osm" size="sm" className={pill}>OSM</ToggleGroupItem>
-            <ToggleGroupItem value="none" size="sm" className={pill}>None</ToggleGroupItem>
-          </ToggleGroup>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-[11px] text-white/45">Vertical</span>
-          <ToggleGroup type="single" value={String(st?.zex ?? 1)} onValueChange={(v) => v && set({ zex: +v })} className="gap-1.5">
-            {[1, 2, 5, 10].map((z) => <ToggleGroupItem key={z} value={String(z)} size="sm" className={pill}>{z}×</ToggleGroupItem>)}
-          </ToggleGroup>
-        </div>
+        <div className="mt-2 grid gap-2 md:hidden">{groundVertical}</div>
         <Note>Buildings: OSM height / levels tags, untagged ones assumed {st?.bldH ?? 6} m. Terrain: {ap?.demSrc ?? "—"}.</Note>
       </div>
 
@@ -298,7 +302,10 @@ export function Simulator({ onHome }: { onHome: () => void }) {
         </div>
       </div>
 
-      <span className="pointer-events-none absolute right-7 bottom-9 font-mono text-[11.5px] tracking-wide text-white/60 max-md:hidden">{ap ? `${Math.abs(ap.origin[0]).toFixed(4)}°${ap.origin[0] < 0 ? "S" : "N"}  ${Math.abs(ap.origin[1]).toFixed(4)}°${ap.origin[1] < 0 ? "W" : "E"}` : ""}</span>
+      <div className="absolute right-7 bottom-9 flex flex-col items-end gap-2 max-md:hidden">
+        {groundVertical}
+        <span className="pointer-events-none mt-1 font-mono text-[11.5px] tracking-wide text-white/60">{ap ? `${Math.abs(ap.origin[0]).toFixed(4)}°${ap.origin[0] < 0 ? "S" : "N"}  ${Math.abs(ap.origin[1]).toFixed(4)}°${ap.origin[1] < 0 ? "W" : "E"}` : ""}</span>
+      </div>
       <div className="pointer-events-none absolute right-7 bottom-3 left-7 flex justify-between text-[10.5px] text-white/35 max-md:inset-x-3 max-md:bottom-1 max-md:text-[9px]">
         <span className="max-md:hidden">Drag to orbit · scroll to zoom · right-drag to pan · hover a building for its clearance</span>
         <span className="truncate">Terrain GEDTM30 © OpenGeoHub (CC BY 4.0) · Buildings © OpenStreetMap contributors · Imagery © Esri</span>
