@@ -14,6 +14,12 @@ const DOES = [
   ["Share", "One link, no installation. The same picture for everyone at the table.", "공유", "설치 없이 링크 하나로. 회의에 모인 모두가 같은 그림을 봅니다."],
 ];
 
+// Korean mission, broken into lines as written (the breaks drop on phones, where the column is too narrow for them)
+const MISSION_KO = [
+  ["공항은 도면 위에서 계획되지만,", "비행은 3차원에서 이루어집니다.", "오랫동안 모든 접근과 출발의", "안전을 지키는 표면들은", "전문가만 읽을 수 있는", "도면 속에 있었습니다."],
+  ["OLS Simulator는 보이지 않던", "공역을 눈앞에 보여 줍니다.", "엔지니어와 항공당국, 사업주가 브라우저에서", "몇 분 만에 같은 화면을 보며", "확인하고, 질문하고, 함께 결정할 수 있도록."],
+];
+
 export default function About() {
   const t = useT();
   return (
@@ -29,7 +35,7 @@ export default function About() {
           <Reveal delay={100}><h1 className="max-w-[900px] font-serif text-[clamp(46px,7vw,108px)] leading-[0.95] text-[#f3eee6]">The Line in the Aerospace</h1></Reveal>
           <Reveal delay={250}><p className="mt-7 max-w-[560px] text-[clamp(16px,1.35vw,19px)] leading-relaxed text-white/75">
             {t(<>OLS Simulator is built by <span className="text-white">Hyunki Kang</span> — an airport planner rethinking how the industry sees the airspace around an airport.</>,
-              <>OLS Simulator는 공항 계획가 <span className="text-white">강현기</span>가 만들었습니다. 공항 주변의 하늘을 바라보는 업계의 방식을 새로 그려 나갑니다.</>)}
+              <>OLS Simulator는 공항 엔지니어 <span className="text-white">강 현기</span>가 만들었습니다.<br />공항 업계의 관행적인 2D에서 3D로 새로운 차원으로 그려 나갑니다.</>)}
           </p></Reveal>
         </div>
       </section>
@@ -38,10 +44,10 @@ export default function About() {
       <section className="bg-[linear-gradient(to_bottom,#dcdcd8_0%,#c9c9c5_30%,#6e7072_62%,#050608_100%)] px-[4.5vw] pt-28 pb-24 max-md:px-5 max-md:pt-16">
         <div className="grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-[6vw] max-lg:grid-cols-1 max-lg:gap-y-6">
           <Reveal><Label dark>{t("MISSION", "미션")}</Label></Reveal>
-          <Reveal delay={100}><p className="text-[clamp(24px,2.6vw,40px)] leading-[1.18] font-semibold tracking-[-0.015em] text-[#121416]">
-            {t("Airports are planned on paper, but flown in three dimensions. For decades the surfaces that keep every approach and departure safe have lived in drawings only specialists could read. OLS Simulator makes that invisible airspace visible — so engineers, authorities and owners can see it, question it and decide on it together, in a browser, in minutes.",
-              "공항은 도면 위에서 계획되지만, 비행은 3차원에서 이루어집니다. 오랫동안 모든 접근과 출발의 안전을 지키는 표면들은 전문가만 읽을 수 있는 도면 속에 있었습니다. OLS Simulator는 보이지 않던 그 공역을 눈앞에 보여 줍니다. 엔지니어와 항공당국, 사업주가 브라우저에서 몇 분 만에 같은 화면을 보며 확인하고, 질문하고, 함께 결정할 수 있도록.")}
-          </p></Reveal>
+          <Reveal delay={100}><div className="space-y-[1.1em] text-right text-[clamp(24px,2.6vw,40px)] leading-[1.18] font-semibold tracking-[-0.015em] text-[#121416]">
+            {t(<p>Airports are planned on paper, but flown in three dimensions. For decades the surfaces that keep every approach and departure safe have lived in drawings only specialists could read. OLS Simulator makes that invisible airspace visible — so engineers, authorities and owners can see it, question it and decide on it together, in a browser, in minutes.</p>,
+              <>{MISSION_KO.map((para, i) => <p key={i}>{para.map((l, j) => <span key={j}>{j > 0 && <br className="max-md:hidden" />}{j > 0 && " "}{l}</span>)}</p>)}</>)}
+          </div></Reveal>
         </div>
         <Reveal className="mt-24 max-md:mt-14">
           <figure>
