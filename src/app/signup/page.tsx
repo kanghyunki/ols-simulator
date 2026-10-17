@@ -5,7 +5,7 @@ import { SiteNav } from "@/components/site-nav";
 import { dialCodes, type Dial } from "@/data/dial-codes";
 import { supabase } from "@/lib/supabase";
 
-// Sign in. New emails sign up through Supabase Auth (the password stays in Auth; name, phone, birth date and consent go
+// Sign up (formerly /signin, which redirects here). New emails sign up through Supabase Auth (the password stays in Auth; name, phone, birth date and consent go
 // to public.ols_members via a database trigger). An email that already has an account signs in with the password.
 const label = "mb-2 block text-[14px] font-medium text-white/85";
 const field = "h-14 w-full rounded-md border border-white/12 bg-white/[.04] px-4 text-[16px] text-white placeholder:text-white/35 outline-none transition focus:border-[#4f7dff] focus:bg-white/[.06]";
@@ -58,7 +58,7 @@ const ERRORS: Record<string, string> = {
   weak_password: "That password is too weak. Use at least 8 characters with letters and numbers.",
 };
 
-export default function SignIn() {
+export default function SignUp() {
   const [f, setF] = useState({ name: "", phone: "", email: "", password: "", dob: "" });
   const [dial, setDial] = useState<Dial>({ iso: "KR", code: "82", name: "South Korea" });
   const [agree, setAgree] = useState(false), [busy, setBusy] = useState(false), [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -71,7 +71,7 @@ export default function SignIn() {
     setBusy(true); setMsg(null);
     const email = f.email.trim(), password = f.password;
     const { data, error } = await supabase.auth.signUp({ email, password, options: {
-      emailRedirectTo: `${location.origin}/signin`,
+      emailRedirectTo: `${location.origin}/signup`,
       data: { app: "ols-simulator", name: f.name.trim(), phone_country: dial.iso, phone_code: dial.code, phone: f.phone.replace(/\D/g, ""), birth_date: f.dob, privacy_consent: true },
     } });
     // An existing account comes back as a user with no identities (Supabase hides whether the email is taken): sign in instead
@@ -92,7 +92,7 @@ export default function SignIn() {
       <main className="relative grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-[6vw] px-[4.5vw] pt-[6vh] pb-20 max-lg:grid-cols-1 max-md:px-5 max-md:pt-6">
         <section>
           <p className="mb-6 font-mono text-[12px] tracking-[0.14em] text-white/55">ACCOUNT</p>
-          <h1 className="font-serif text-[clamp(48px,6.2vw,96px)] leading-[0.95] text-[#f3eee6]">Sign in</h1>
+          <h1 className="font-serif text-[clamp(48px,6.2vw,96px)] leading-[0.95] text-[#f3eee6]">Sign up</h1>
           <p className="mt-8 max-w-[520px] text-[clamp(16px,1.3vw,19px)] leading-relaxed text-white/70 max-lg:mb-12">
             Your workspace for obstacle limitation surfaces, runway scenarios and flight procedures.
           </p>
@@ -118,7 +118,7 @@ export default function SignIn() {
           </div>
           <div className="col-span-2 max-md:col-span-1">
             <button type="submit" disabled={!ok || busy} className="h-14 w-full max-w-[420px] rounded-md bg-[#3f6bff] font-mono text-[13px] tracking-[0.14em] text-white transition hover:bg-[#5a80ff] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35">
-              {busy ? "SIGNING IN…" : "SIGN IN"}
+              {busy ? "SIGNING UP…" : "SIGN UP"}
             </button>
             <p role="status" className={`mt-5 text-[15px] ${msg ? (msg.ok ? "text-[#6fcf8a]" : "text-[#f0625c]") : "text-white/60"}`}>
               {msg ? msg.text : <>Questions first? <Link href="/contact" className="text-white/85 underline-offset-4 hover:underline">Contact us</Link></>}

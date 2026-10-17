@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { SiteNav } from "@/components/site-nav";
 import { supabase, SUPABASE_URL, SUPABASE_KEY } from "@/lib/supabase";
 
-// Log in: email first, then the password (Supabase Auth, the accounts made on /signin). Google goes through Supabase
+// Log in: email first, then the password (Supabase Auth, the accounts made on /signup). Google goes through Supabase
 // OAuth, which works once the Google provider is switched on in the Supabase dashboard.
 const field = "h-12 w-full rounded-md border border-white/12 bg-white/[.04] px-4 text-[16px] text-white placeholder:text-white/35 outline-none transition focus:border-[#4f7dff] focus:bg-white/[.06]";
 
@@ -72,7 +72,7 @@ export default function Login() {
         )}
 
         {msg && <p role="status" className={`mt-6 text-center text-[14.5px] ${msg.ok ? "text-[#6fcf8a]" : "text-[#f0625c]"}`}>{msg.text}</p>}
-        {!who && <p className="mt-9 text-[15px] text-white/55">Don&apos;t have an account? <Link href="/signin" className="text-[#7d9bff] transition hover:text-[#a3b9ff]">Get started</Link></p>}
+        {!who && <p className="mt-9 text-[15px] text-white/55">Don&apos;t have an account? <Link href="/signup" className="text-[#7d9bff] transition hover:text-[#a3b9ff]">Get started</Link></p>}
       </main>
     </div>
   );

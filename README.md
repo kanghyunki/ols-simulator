@@ -42,7 +42,7 @@ npm run dev
 | 화면(공항 선택, 표면 토글, 고도 판독) | `src/components/simulator.tsx` |
 | 공항 레지스트리(37개 공항: 활주로 시단 좌표·표고, 가정값 안내) | `src/data/airports.js` |
 | 공항별 OSM 활주로·건물·도로 데이터 / 지형 격자 | `public/data/osm_*.js`, `public/dem/*.bin` |
-| 랜딩·Product·Project·About·Request demo·Sign in 페이지 | `src/app/` |
+| 랜딩·Product·Project·About·Contact·Log in·Sign up 페이지 | `src/app/` |
 
 공항 데이터(`airports.js`, `public/data`, `public/dem`)는 별도 저장소(cadip-web)의 `tools/ols` 스크립트로
 OpenStreetMap(Overpass)·GEDTM30에서 생성했습니다.

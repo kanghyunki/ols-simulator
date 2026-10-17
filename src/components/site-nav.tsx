@@ -19,7 +19,7 @@ export function SiteNav() {
           : <button key={t} type="button" className={item(false)}>{t}</button>)}
       </nav>
       <div className="ml-auto flex items-center gap-6 text-[15px] max-md:gap-4">
-        <Link href="/signin" aria-current={path === "/signin" ? "page" : undefined} className={`transition hover:text-white max-md:hidden ${path === "/signin" ? "text-white" : "text-white/80"}`}>Sign in</Link>
+        <Link href="/signup" aria-current={path === "/signup" ? "page" : undefined} className={`transition hover:text-white max-md:hidden ${path === "/signup" ? "text-white" : "text-white/80"}`}>Sign up</Link>
         <Link href="/login" className="flex h-10 items-center rounded-md bg-white px-4 font-medium text-[#0b0d10] transition hover:bg-white/85 max-md:h-9 max-md:px-3 max-md:text-[14px]">Log in</Link>
       </div>
     </header>
