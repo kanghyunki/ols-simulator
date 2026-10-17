@@ -156,7 +156,7 @@ const AIRPORTS={
        eA:31.4, eB:39.0, cwyA:60, cwyB:120}
     ],
     bgRwy:['14R/32L'],
-    ext:{ri:0, end:'B', len:750, max:1000},
+    ext:null,   // no preset extension: opens as built (the submitted demo scenario extends 14L by +500 m from here)
     fitAll:9000, fitRwy:2600,
     assume:'· 시단 좌표·표고(14L 103ft=31.4m, 32R 128ft=39.0m), AD 표고 39m, 활주로 2750×45m, CWY 60/120m: <b>PNG AIP AD 2 AYPY (30 OCT 2025)</b>.<br>'
       +'· AYPY는 ILS 없음(비정밀) → OLS 제원은 Code 4 정밀 CAT I과 동일, OFZ는 참고용 옵션.<br>'

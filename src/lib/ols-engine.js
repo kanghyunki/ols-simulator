@@ -230,7 +230,7 @@ export function createEngine(canvas, cb) {
       return; }
     AP = ap; initAp(AP); state.E = AP.E;
     state.extA = AP.rwys.map(() => 0); state.extB = AP.rwys.map(() => 0); state.par = []; state.showEx = false;
-    if (AP.ext) (AP.ext.end === 'A' ? state.extA : state.extB)[AP.ext.ri] = AP.ext.len;   // registry preset (PMIA 32R +750 m)
+    if (AP.ext) (AP.ext.end === 'A' ? state.extA : state.extB)[AP.ext.ri] = AP.ext.len;   // optional registry preset extension
     if (!AP.dem) { if (AP.demFile) loadFileTerrain(); else loadOnlineTerrain(); }
     K.s = K.o = K.g = K.t = K.b = K.p = null; sync(); fit('all'); emit();
   }
