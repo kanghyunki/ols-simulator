@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google";
+import { Inter, Instrument_Serif, JetBrains_Mono, Noto_Serif_KR } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"], weight: ["400", "500", "600"] });
 const serif = Instrument_Serif({ variable: "--font-instrument", subsets: ["latin"], weight: "400" });
+// Korean serif for the headings in Korean mode (Instrument Serif has no Hangul); only the slices in use are fetched
+const serifKo = Noto_Serif_KR({ variable: "--font-serif-ko", subsets: ["latin"], weight: "500", preload: false });
 const mono = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"], weight: ["400", "500"] });
 
 export const metadata: Metadata = {
@@ -17,7 +19,7 @@ export const viewport = { themeColor: "#0b0d10" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`dark h-full ${inter.variable} ${serif.variable} ${mono.variable}`}>
+    <html lang="en" className={`dark h-full ${inter.variable} ${serif.variable} ${serifKo.variable} ${mono.variable}`}>
       <body className="h-full overflow-hidden bg-background text-foreground antialiased">{children}</body>
     </html>
   );

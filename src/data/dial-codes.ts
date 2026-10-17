@@ -1,4 +1,4 @@
-// ITU country calling codes by ISO 3166 region. Names are not stored: Intl.DisplayNames gives them in English.
+// ITU country calling codes by ISO 3166 region. Names are not stored: Intl.DisplayNames gives them in the page language.
 const RAW = `AF93 AL355 DZ213 AD376 AO244 AG1 AR54 AM374 AU61 AT43 AZ994 BS1 BH973 BD880 BB1 BY375 BE32 BZ501 BJ229 BT975
 BO591 BA387 BW267 BR55 BN673 BG359 BF226 BI257 KH855 CM237 CA1 CV238 CF236 TD235 CL56 CN86 CO57 KM269 CG242 CD243
 CR506 CI225 HR385 CU53 CY357 CZ420 DK45 DJ253 DM1 DO1 EC593 EG20 SV503 GQ240 ER291 EE372 SZ268 ET251 FJ679 FI358
@@ -13,8 +13,8 @@ PF689 GL299 FO298 BM1 KY1 RE262 GP590 MQ596 XK383`;
 
 export type Dial = { iso: string; code: string; name: string };
 
-export function dialCodes(): Dial[] {
-  const names = new Intl.DisplayNames(["en"], { type: "region" });
+export function dialCodes(lang = "en"): Dial[] {
+  const names = new Intl.DisplayNames([lang], { type: "region" });
   return RAW.split(/\s+/).map((t) => ({ iso: t.slice(0, 2), code: t.slice(2), name: names.of(t.slice(0, 2)) ?? t.slice(0, 2) }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => a.name.localeCompare(b.name, lang));
 }

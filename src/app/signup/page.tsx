@@ -2,8 +2,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SiteNav } from "@/components/site-nav";
+import { Reveal } from "@/components/reveal";
 import { dialCodes, type Dial } from "@/data/dial-codes";
 import { supabase } from "@/lib/supabase";
+import { useLang, useT } from "@/lib/lang";
 
 // Sign up (formerly /signin, which redirects here). New emails sign up through Supabase Auth (the password stays in Auth; name, phone, birth date and consent go
 // to public.ols_members via a database trigger). An email that already has an account signs in with the password.
@@ -12,7 +14,8 @@ const field = "h-14 w-full rounded-md border border-white/12 bg-white/[.04] px-4
 
 // Country calling code picker with search (name, ISO code or number)
 function DialPicker({ value, onChange }: { value: Dial; onChange: (d: Dial) => void }) {
-  const all = useMemo(dialCodes, []);
+  const lang = useLang(), tr = useT();
+  const all = useMemo(() => dialCodes(lang), [lang]);
   const [open, setOpen] = useState(false), [q, setQ] = useState("");
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -26,14 +29,14 @@ function DialPicker({ value, onChange }: { value: Dial; onChange: (d: Dial) => v
 
   return (
     <div ref={box} className="relative">
-      <button type="button" aria-haspopup="listbox" aria-expanded={open} aria-label="Country code" onClick={() => setOpen((o) => !o)}
+      <button type="button" aria-haspopup="listbox" aria-expanded={open} aria-label={tr("Country code", "국가번호")} onClick={() => setOpen((o) => !o)}
         className={`${field} flex items-center gap-2 pr-3 text-left`}>
         <span className="font-mono text-[13px] text-white/50">{value.iso}</span><span>+{value.code}</span>
         <svg viewBox="0 0 20 20" className="ml-auto size-[18px] text-white/60" aria-hidden><path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>
       </button>
       {open && (
         <div className="absolute top-[calc(100%+6px)] left-0 z-10 w-[320px] max-w-[85vw] overflow-hidden rounded-md border border-white/12 bg-[#14161a] shadow-2xl">
-          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search country or code"
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr("Search country or code", "국가명 또는 국가번호 검색")}
             onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); if (e.key === "Enter") { e.preventDefault(); if (hits[0]) pick(hits[0]); } }}
             className="h-11 w-full border-b border-white/10 bg-transparent px-4 text-[15px] text-white placeholder:text-white/35 outline-none" />
           <ul role="listbox" className="max-h-64 overflow-y-auto py-1 [scrollbar-width:thin]">
@@ -43,7 +46,7 @@ function DialPicker({ value, onChange }: { value: Dial; onChange: (d: Dial) => v
                 <span className="w-6 font-mono text-[12px] text-white/45">{d.iso}</span><span className="truncate">{d.name}</span><span className="ml-auto text-white/50">+{d.code}</span>
               </li>
             ))}
-            {!hits.length && <li className="px-4 py-3 text-[14px] text-white/40">No match</li>}
+            {!hits.length && <li className="px-4 py-3 text-[14px] text-white/40">{tr("No match", "결과 없음")}</li>}
           </ul>
         </div>
       )}
@@ -51,21 +54,22 @@ function DialPicker({ value, onChange }: { value: Dial; onChange: (d: Dial) => v
   );
 }
 
-const ERRORS: Record<string, string> = {
-  email_address_not_authorized: "Sign-up emails are not enabled for this address yet. Please try again later or request a demo.",
-  over_email_send_rate_limit: "Too many sign-ups in a short time. Please try again in an hour.",
-  email_address_invalid: "That email address is not accepted. Please use your work email.",
-  weak_password: "That password is too weak. Use at least 8 characters with letters and numbers.",
+const ERRORS: Record<string, [string, string]> = {
+  email_address_not_authorized: ["Sign-up emails are not enabled for this address yet. Please try again later or request a demo.", "이 주소로는 아직 가입 메일을 보낼 수 없습니다. 잠시 후 다시 시도하시거나 문의해 주세요."],
+  over_email_send_rate_limit: ["Too many sign-ups in a short time. Please try again in an hour.", "짧은 시간에 가입 요청이 너무 많습니다. 한 시간 뒤에 다시 시도해 주세요."],
+  email_address_invalid: ["That email address is not accepted. Please use your work email.", "사용할 수 없는 이메일 주소입니다. 업무용 이메일을 사용해 주세요."],
+  weak_password: ["That password is too weak. Use at least 8 characters with letters and numbers.", "비밀번호가 너무 쉽습니다. 영문과 숫자를 섞어 8자 이상으로 정해 주세요."],
 };
 
 export default function SignUp() {
+  const t = useT();
   const [f, setF] = useState({ name: "", phone: "", email: "", password: "", dob: "" });
   const [dial, setDial] = useState<Dial>({ iso: "KR", code: "82", name: "South Korea" });
   const [agree, setAgree] = useState(false), [busy, setBusy] = useState(false), [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const up = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   const today = new Date().toISOString().slice(0, 10);
   // Back from the confirmation link (or already signed in): the client picks the session up from the URL
-  useEffect(() => { supabase.auth.getSession().then(({ data }) => { const e = data.session?.user.email; if (e) setMsg({ ok: true, text: `Signed in as ${e}.` }); }); }, []);
+  useEffect(() => { supabase.auth.getSession().then(({ data }) => { const e = data.session?.user.email; if (e) setMsg({ ok: true, text: t(`Signed in as ${e}.`, `${e}(으)로 로그인되었습니다.`) }); }); }, []);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); if (!ok || busy) return;
     setBusy(true); setMsg(null);
@@ -77,9 +81,9 @@ export default function SignUp() {
     // An existing account comes back as a user with no identities (Supabase hides whether the email is taken): sign in instead
     if (!error && data.user && !data.user.identities?.length) {
       const r = await supabase.auth.signInWithPassword({ email, password });
-      setMsg(r.error ? { ok: false, text: "That email already has an account, and the password does not match." } : { ok: true, text: `Signed in as ${email}.` });
-    } else if (error) setMsg({ ok: false, text: ERRORS[error.code ?? ""] ?? error.message });
-    else setMsg({ ok: true, text: data.session ? `Welcome, ${f.name.trim()} — your account is ready.` : `Almost done — we sent a confirmation link to ${email}.` });
+      setMsg(r.error ? { ok: false, text: t("That email already has an account, and the password does not match.", "이미 가입된 이메일이며, 비밀번호가 맞지 않습니다.") } : { ok: true, text: t(`Signed in as ${email}.`, `${email}(으)로 로그인되었습니다.`) });
+    } else if (error) setMsg({ ok: false, text: ERRORS[error.code ?? ""] ? t(...ERRORS[error.code ?? ""]) : error.message });
+    else setMsg({ ok: true, text: data.session ? t(`Welcome, ${f.name.trim()} — your account is ready.`, `${f.name.trim()}님, 환영합니다. 계정이 만들어졌습니다.`) : t(`Almost done — we sent a confirmation link to ${email}.`, `거의 다 됐습니다. ${email}로 확인 링크를 보냈습니다.`) });
     setBusy(false);
   };
   const ok = f.name.trim() && /^[\d\s-]{6,16}$/.test(f.phone) && /^\S+@\S+\.\S+$/.test(f.email) && f.password.length >= 8 && f.dob && f.dob < today && agree;
@@ -91,40 +95,42 @@ export default function SignUp() {
 
       <main className="relative grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-x-[6vw] px-[4.5vw] pt-[6vh] pb-20 max-lg:grid-cols-1 max-md:px-5 max-md:pt-6">
         <section>
-          <p className="mb-6 font-mono text-[12px] tracking-[0.14em] text-white/55">ACCOUNT</p>
-          <h1 className="font-serif text-[clamp(48px,6.2vw,96px)] leading-[0.95] text-[#f3eee6]">Sign up</h1>
-          <p className="mt-8 max-w-[520px] text-[clamp(16px,1.3vw,19px)] leading-relaxed text-white/70 max-lg:mb-12">
-            Your workspace for obstacle limitation surfaces, runway scenarios and flight procedures.
-          </p>
+          <Reveal><p className="mb-6 font-mono text-[12px] tracking-[0.14em] text-white/55">{t("ACCOUNT", "계정")}</p></Reveal>
+          <Reveal delay={100}><h1 className="font-serif text-[clamp(48px,6.2vw,96px)] leading-[0.95] text-[#f3eee6]">{t("Sign up", "회원가입")}</h1></Reveal>
+          <Reveal delay={250}><p className="mt-8 max-w-[520px] text-[clamp(16px,1.3vw,19px)] leading-relaxed text-white/70 max-lg:mb-12">
+            {t("Your workspace for obstacle limitation surfaces, runway scenarios and flight procedures.", "장애물제한표면, 활주로 시나리오, 비행절차를 위한 나만의 작업 공간.")}
+          </p></Reveal>
         </section>
 
+        <Reveal delay={400}>
         <form onSubmit={submit} className="grid grid-cols-2 gap-x-6 gap-y-7 max-md:grid-cols-1">
-          <div className="col-span-2 max-md:col-span-1"><label className={label} htmlFor="name">Name *</label><input id="name" required autoComplete="name" placeholder="Hong Gildong" value={f.name} onChange={up("name")} className={field} /></div>
+          <div className="col-span-2 max-md:col-span-1"><label className={label} htmlFor="name">{t("Name *", "이름 *")}</label><input id="name" required autoComplete="name" placeholder={t("Hong Gildong", "홍길동")} value={f.name} onChange={up("name")} className={field} /></div>
           <div className="col-span-2 max-md:col-span-1">
-            <label className={label} htmlFor="phone">Phone number *</label>
+            <label className={label} htmlFor="phone">{t("Phone number *", "전화번호 *")}</label>
             <div className="grid grid-cols-[150px_minmax(0,1fr)] gap-3">
               <DialPicker value={dial} onChange={setDial} />
               <input id="phone" type="tel" required autoComplete="tel-national" inputMode="tel" placeholder="10 1234 5678" value={f.phone} onChange={up("phone")} className={field} />
             </div>
           </div>
-          <div><label className={label} htmlFor="email">Email address *</label><input id="email" type="email" required autoComplete="email" placeholder="Hong@company.com" value={f.email} onChange={up("email")} className={field} /></div>
-          <div><label className={label} htmlFor="password">Password *</label><input id="password" type="password" required minLength={8} autoComplete="current-password" placeholder="At least 8 characters" value={f.password} onChange={up("password")} className={field} /></div>
-          <div><label className={label} htmlFor="dob">Date of birth *</label><input id="dob" type="date" required max={today} value={f.dob} onChange={up("dob")} className={`${field} [color-scheme:dark] ${f.dob ? "" : "text-white/35"}`} /></div>
+          <div><label className={label} htmlFor="email">{t("Email address *", "이메일 주소 *")}</label><input id="email" type="email" required autoComplete="email" placeholder="Hong@company.com" value={f.email} onChange={up("email")} className={field} /></div>
+          <div><label className={label} htmlFor="password">{t("Password *", "비밀번호 *")}</label><input id="password" type="password" required minLength={8} autoComplete="current-password" placeholder={t("At least 8 characters", "8자 이상")} value={f.password} onChange={up("password")} className={field} /></div>
+          <div><label className={label} htmlFor="dob">{t("Date of birth *", "생년월일 *")}</label><input id="dob" type="date" required max={today} value={f.dob} onChange={up("dob")} className={`${field} [color-scheme:dark] ${f.dob ? "" : "text-white/35"}`} /></div>
           <div className="col-span-2 max-md:col-span-1">
             <label className="flex cursor-pointer items-start gap-3 text-[15px] leading-snug text-white/75">
               <input type="checkbox" required checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 size-5 shrink-0 cursor-pointer accent-[#3f6bff]" />
-              Do you agree to the collection and use of your personal information? *
+              {t("Do you agree to the collection and use of your personal information? *", "개인정보 수집·이용에 동의하십니까? *")}
             </label>
           </div>
           <div className="col-span-2 max-md:col-span-1">
             <button type="submit" disabled={!ok || busy} className="h-14 w-full max-w-[420px] rounded-md bg-[#3f6bff] font-mono text-[13px] tracking-[0.14em] text-white transition hover:bg-[#5a80ff] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35">
-              {busy ? "SIGNING UP…" : "SIGN UP"}
+              {busy ? t("SIGNING UP…", "가입 중…") : t("SIGN UP", "가입하기")}
             </button>
             <p role="status" className={`mt-5 text-[15px] ${msg ? (msg.ok ? "text-[#6fcf8a]" : "text-[#f0625c]") : "text-white/60"}`}>
-              {msg ? msg.text : <>Questions first? <Link href="/contact" className="text-white/85 underline-offset-4 hover:underline">Contact us</Link></>}
+              {msg ? msg.text : <>{t("Questions first?", "먼저 궁금한 점이 있으신가요?")} <Link href="/contact" className="text-white/85 underline-offset-4 hover:underline">{t("Contact us", "문의하기")}</Link></>}
             </p>
           </div>
         </form>
+        </Reveal>
       </main>
     </div>
   );
