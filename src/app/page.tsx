@@ -28,8 +28,8 @@ const ORGS: { name: string; sub?: string; koName?: string; koSub?: string; cls: 
 // Footer columns: [English, 한국어, link] — entries without a page yet are plain text
 const FOOTER: [string, string, [string, string, string | null][]][] = [
   ["Product", "제품", [["OLS Simulator", "OLS Simulator", "/product"], ["Flight Procedure", "Flight Procedure", "/product"]]],
-  ["Project", "프로젝트", [["CADIP-II", "CADIP-II", "/project"], ["Airports", "공항", "/project"]]],
-  ["About", "소개", [["Company", "회사 소개", "/about"], ["Team", "팀", null]]],
+  ["Project", "프로젝트", [["Airports", "공항", "/project"]]],
+  ["About", "소개", [["Company", "회사 소개", "/about"]]],
   ["Contact", "문의", [["Request a demo", "데모 요청", "/contact"]]],
 ];
 
