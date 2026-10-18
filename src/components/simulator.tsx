@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
 import { LangButton } from "@/components/lang-button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { PROCEDURES } from "@/data/procedures.js";
+import { PROCEDURES, PROC_NOTES } from "@/data/procedures.js";
 import { useT } from "@/lib/lang";
 import { createEngine, AIRPORTS, SURFACES as _S, OFZ_SURFACES as _O, ALL_KEYS as _K } from "@/lib/ols-engine.js";
 type Surf = [string, string, number];
@@ -280,7 +280,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
                 </Toggle>
               ))}
             </div>
-            <Note>AIP RKSI AD 2-62 ~ 2-69, ILS or LOC CAT II &amp; III (AMDT 13/25). {t("Approaches at chart minimum altitudes, straight legs from PAMBI or ENPIL. Orange: missed approach, turn points approximate (≈).", "차트 최저고도로 그린 접근경로이며, PAMBI 또는 ENPIL에서 직선으로 연결했습니다. 주황: 실패접근, 선회 지점은 근사값(≈).")}</Note>
+            <Note>{(PROC_NOTES as Record<string, string>)[snap?.apId ?? ""]} {t("Approaches at chart minimum altitudes, flown as straight legs; DME arcs drawn through intermediate points. Orange: missed approach; ≈ points approximate (2.5 % minimum climb).", "차트 최저고도로 그린 접근경로이며, 지점 사이는 직선, DME 호는 중간점으로 그렸습니다. 주황: 실패접근, ≈ 표시 지점은 근사값(최소 상승률 2.5 %).")}</Note>
           </>
         )}
         <H>{t("Check", "검토")}</H>

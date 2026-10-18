@@ -5,7 +5,8 @@ ICAO Annex 14 장애물제한표면(OLS)을 실제 지형·건물 위에 3D로 �
 
 - **실서버:** https://ols-simulator.vercel.app
 - **바로 열기:** [잭슨스 공항(PMIA)](https://ols-simulator.vercel.app/#PMIA) ·
-  [인천 + ILS 접근절차](https://ols-simulator.vercel.app/?proc=all#ICN)
+  [인천 + ILS 접근절차](https://ols-simulator.vercel.app/?proc=all#ICN) ·
+  [김포](https://ols-simulator.vercel.app/?proc=all#RKSS) · [제주](https://ols-simulator.vercel.app/?proc=all#RKPC) · [김해](https://ols-simulator.vercel.app/?proc=all#RKPK)
 
 ## 시연 시나리오 (효과 자기신고서 3번과 동일)
 
@@ -41,7 +42,7 @@ npm run dev
 | Annex 14 OLS 기하 계산(진입·이륙상승·전이·내부수평·원추·OFZ), 복수 활주로 최저 지배표면 합성 | `src/lib/ols-engine.js` (`olsCand`, `ols`, `olsAll`) |
 | 지형(GEDTM30 내장 / 온라인 지형 타일), 지형·건물 침투 판정 | `src/lib/ols-engine.js` (`demAt`, `penColor`, `buildObstacles`, `stats`) |
 | 활주로 연장·평행활주로 시나리오, 기존 OLS 비교 | `src/lib/ols-engine.js` (`frames`, `setExt`), `src/components/simulator.tsx` |
-| 계기접근절차(ILS RWY 33L/33R/34L/34R, 실패접근) 3D 표시, 연장 시 경로 이동 | `src/data/procedures.js`, `src/lib/ols-engine.js` (`buildProcs`, `procShift`) |
+| 계기접근절차(ILS, 실패접근) 3D 표시 — 인천 4개·김포 5개·제주 4개·김해 1개, 연장 시 경로 이동 | `src/data/procedures.js`, `src/lib/ols-engine.js` (`buildProcs`, `procShift`) |
 | 화면(공항 선택, 표면 토글, 고도 판독) | `src/components/simulator.tsx` |
 | 공항 레지스트리(37개 공항: 활주로 시단 좌표·표고, 가정값 안내) | `src/data/airports.js` |
 | 공항별 OSM 활주로·건물·도로 데이터 / 지형 격자 | `public/data/osm_*.js`, `public/dem/*.bin` |
@@ -57,4 +58,4 @@ OpenStreetMap(Overpass)·GEDTM30에서 생성했습니다.
 - 지형: GEDTM30 (OpenGeoHub / OpenLandMap, CC BY 4.0), AWS Terrain Tiles
 - 건물·도로: © OpenStreetMap contributors (ODbL). `public/data`의 공항별 데이터는 OpenStreetMap에서 추출한 것으로 ODbL을 따릅니다.
 - 배경 영상: Esri World Imagery (화면 표시용)
-- 계기접근절차: AIP 대한민국 RKSI AD 2-62~69 (AIRAC AIP AMDT 13/25)
+- 계기접근절차: AIP 대한민국 RKSI AD 2-62~69 (AIRAC AIP AMDT 13/25), RKSS AD 2-29/30/32/34/37, RKPC AD 2-21/22/26/27, RKPK AD 2-21 (AIP AMDT 11/26). DME 호와 실패접근 중간 고도(최소 상승률 2.5 %)는 근사값(≈)
