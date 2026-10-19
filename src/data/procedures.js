@@ -1,10 +1,14 @@
 // Instrument procedures drawn as 3D paths over the OLS. Altitudes in ft AMSL (chart minimums, flown as straight legs).
-// Each procedure: rwy = landing runway end; paths = [{ ma?, legs: [[fix, lat, lon, alt ft, 'ap'?]] }] in flight order; ma = missed approach;
+// Each procedure: rwy = landing runway end; ops = the runway's role for the animated aircraft ('arr' arrivals only, 'dep' departures only); paths = [{ ma?, legs: [[fix, lat, lon, alt ft, 'ap'?]] }] in flight order; ma = missed approach;
 // 'ap' = approximated point, not a published fix: the missed-approach turn at 500 ft is put at the runway end, and the
 // DME turn point where the published heading reaches the DME distance, with the altitude from the 2.5 % minimum climb.
 const dms = (d, m, s) => d + m / 60 + s / 3600;
 const PAMBI = dms(37, 10, 54.3), PAMBI_E = dms(126, 32, 34.4), ENPIL = dms(37, 9, 39.0), ENPIL_E = dms(126, 43, 34.0);
 const GE973 = ['GE973', dms(37, 27, 47.0), dms(126, 13, 29.0), 3000], PY985 = ['PY985', dms(37, 23, 19.6), dms(126, 5, 55.4), 3000];
+// RKSI 15L/15R/16L/16R (south-flow) fixes
+const MUNAN = dms(37, 34, 9.3), MUNAN_E = dms(126, 11, 53.0), BITIM = dms(37, 40, 48.0), BITIM_E = dms(126, 24, 36.1);
+const OLTEM = ['OLTEM', dms(37, 40, 18.2), dms(126, 20, 46.3), 3000], ATKON = ['ATKON', dms(37, 39, 59.6), dms(126, 18, 23.2), 3000];
+const GC966 = ['GC966', dms(37, 17, 53.0), dms(126, 18, 58.0), 4000], DH989 = ['DH989', dms(37, 18, 55.0), dms(126, 19, 59.0), 2000];
 
 // RKSS / RKPC / RKPK fixes shared between procedures (AIP data tabulations)
 const DOKDO = dms(37, 36, 17.1), DOKDO_E = dms(126, 33, 7.1), CAVOI = dms(37, 32, 2.0), CAVOI_E = dms(126, 33, 37.0);
@@ -19,7 +23,7 @@ const AKEVI = ['AKEVI', dms(34, 58, 29.0), dms(128, 57, 48.0), 3300], KEVOX = dm
 // AIRAC AIP AMDT 13/25, WEF 21 JAN 2026. THR elevation 23 ft; the path ends at THR + RDH.
 export const PROCEDURES = {
   ICN: [
-    { id: 'ILS33L', rwy: '33L', name: 'ILS RWY 33L', color: 0x3ddc84, paths: [
+    { id: 'ILS33L', ops: 'dep', rwy: '33L', name: 'ILS RWY 33L', color: 0x3ddc84, paths: [
       { legs: [['PAMBI', PAMBI, PAMBI_E, 3600], ['POSOK', dms(37, 14, 30.3), dms(126, 38, 56.6), 3600], ['LEGUN', dms(37, 18, 14.5), dms(126, 35, 38.6), 3600],
         ['BATAP', dms(37, 20, 54.7), dms(126, 33, 16.8), 2600], ['THR 33L', dms(37, 27, 15.21), dms(126, 27, 39.08), 75]] },
       { legs: [['ENPIL', ENPIL, ENPIL_E, 7000], ['KE019', dms(37, 11, 58.6), dms(126, 41, 10.5), 6000], ['POSOK', dms(37, 14, 30.3), dms(126, 38, 56.6), 5000],
@@ -28,7 +32,7 @@ export const PROCEDURES = {
       { ma: true, legs: [['THR 33L', dms(37, 27, 15.21), dms(126, 27, 39.08), 75], ['500 ft', dms(37, 28, 54.44), dms(126, 26, 10.82), 500, 'ap'],
         ['NCN D6', dms(37, 35, 42.1), dms(126, 26, 28.6), 1500, 'ap'], GE973] },
     ] },
-    { id: 'ILS33R', rwy: '33R', name: 'ILS RWY 33R', color: 0x38bdf8, paths: [
+    { id: 'ILS33R', ops: 'arr', rwy: '33R', name: 'ILS RWY 33R', color: 0x38bdf8, paths: [
       { legs: [['PAMBI', PAMBI, PAMBI_E, 3600], ['BIRIN', dms(37, 14, 38.1), dms(126, 39, 10.4), 3600], ['PIBAK', dms(37, 18, 22.2), dms(126, 35, 52.3), 3600],
         ['GOKAK', dms(37, 21, 2.4), dms(126, 33, 30.5), 2600], ['THR 33R', dms(37, 27, 22.97), dms(126, 27, 52.82), 75]] },
       { legs: [['ENPIL', ENPIL, ENPIL_E, 7000], ['GE019', dms(37, 12, 6.3), dms(126, 41, 24.3), 6000], ['BIRIN', dms(37, 14, 38.1), dms(126, 39, 10.4), 5000],
@@ -37,7 +41,7 @@ export const PROCEDURES = {
       { ma: true, legs: [['THR 33R', dms(37, 27, 22.97), dms(126, 27, 52.82), 75], ['500 ft', dms(37, 29, 2.20), dms(126, 26, 24.56), 500, 'ap'],
         ['NCN D6', dms(37, 35, 41.8), dms(126, 26, 33.3), 1500, 'ap'], GE973] },
     ] },
-    { id: 'ILS34L', rwy: '34L', name: 'ILS RWY 34L', color: 0xfacc15, paths: [
+    { id: 'ILS34L', ops: 'arr', rwy: '34L', name: 'ILS RWY 34L', color: 0xfacc15, paths: [
       { legs: [['PAMBI', PAMBI, PAMBI_E, 2600], ['KAGOK', dms(37, 13, 43.8), dms(126, 37, 34.2), 1600], ['LENBI', dms(37, 17, 27.8), dms(126, 34, 16.1), 1600],
         ['BODEK', dms(37, 22, 37.3), dms(126, 29, 41.9), 1600], ['THR 34L', dms(37, 26, 28.50), dms(126, 26, 16.45), 78]] },
       { legs: [['ENPIL', ENPIL, ENPIL_E, 7000], ['DY019', dms(37, 11, 12.0), dms(126, 39, 48.0), 6000], ['KAGOK', dms(37, 13, 43.8), dms(126, 37, 34.2), 5000],
@@ -46,7 +50,7 @@ export const PROCEDURES = {
       { ma: true, legs: [['THR 34L', dms(37, 26, 28.50), dms(126, 26, 16.45), 78], ['500 ft', dms(37, 28, 7.71), dms(126, 24, 48.18), 500, 'ap'],
         ['WNG D7', dms(37, 28, 56.6), dms(126, 19, 1.2), 1200, 'ap'], PY985] },
     ] },
-    { id: 'ILS34R', rwy: '34R', name: 'ILS RWY 34R', color: 0xc084fc, paths: [
+    { id: 'ILS34R', ops: 'dep', rwy: '34R', name: 'ILS RWY 34R', color: 0xc084fc, paths: [
       { legs: [['PAMBI', PAMBI, PAMBI_E, 2600], ['NIPUT', dms(37, 13, 51.5), dms(126, 37, 47.9), 1600], ['DALKA', dms(37, 17, 35.6), dms(126, 34, 29.8), 1600],
         ['PIPAN', dms(37, 22, 45.1), dms(126, 29, 55.6), 1600], ['THR 34R', dms(37, 26, 36.29), dms(126, 26, 30.21), 78]] },
       { legs: [['ENPIL', ENPIL, ENPIL_E, 7000], ['PY019', dms(37, 11, 20.4), dms(126, 40, 1.2), 6000], ['NIPUT', dms(37, 13, 51.5), dms(126, 37, 47.9), 5000],
@@ -54,6 +58,40 @@ export const PROCEDURES = {
       // RWY HDG, 500 ft turn left HDG 287, WNG D7 turn left direct PY985, 3 000 ft
       { ma: true, legs: [['THR 34R', dms(37, 26, 36.29), dms(126, 26, 30.21), 78], ['500 ft', dms(37, 28, 22.11), dms(126, 24, 56.06), 500, 'ap'],
         ['WNG D7', dms(37, 29, 1.6), dms(126, 19, 4.1), 1200, 'ap'], PY985] },
+    ] },
+    // RKSI AD CHART 2-51/55/58/60 (+ -1), ILS Z RWY 15L, ILS Z RWY 15R, ILS RWY 16L, ILS RWY 16R CAT II & III (AMDT 13/25, 2/26, 3/26).
+    // Missed approach: 15L/R turn at 720 ft (put where the 2.5 % climb reaches it), 16L/R turn at 500 ft (put at the runway end).
+    { id: 'ILSZ15R', ops: 'dep', rwy: '15R', name: 'ILS Z RWY 15R', color: 0x86efac, paths: [
+      { legs: [['MUNAN', MUNAN, MUNAN_E, 3000], ['TASUR', dms(37, 37, 46.4), dms(126, 18, 16.2), 3000], ['ANBOG', dms(37, 35, 14.6), dms(126, 20, 31.9), 2600],
+        ['THR 15R', dms(37, 28, 54.44), dms(126, 26, 10.82), 75]] },
+      { legs: [['BITIM', BITIM, BITIM_E, 3500], OLTEM, ['TASUR', dms(37, 37, 46.4), dms(126, 18, 16.2), 3000]] },
+      // RWY HDG, 720 ft turn left HDG 107, NCN D8 turn right direct GC966, 4 000 ft
+      { ma: true, legs: [['THR 15R', dms(37, 28, 54.44), dms(126, 26, 10.82), 75], ['720 ft', 37.419343, 126.491834, 720, 'ap'],
+        ['NCN D8', 37.411554, 126.561607, 1230, 'ap'], GC966] },
+    ] },
+    { id: 'ILSZ15L', ops: 'arr', rwy: '15L', name: 'ILS Z RWY 15L', color: 0x7dd3fc, paths: [
+      { legs: [['MUNAN', MUNAN, MUNAN_E, 3000], ['PUDIM', dms(37, 37, 54.2), dms(126, 18, 30.0), 3000], ['SAKOS', dms(37, 35, 22.4), dms(126, 20, 45.7), 2600],
+        ['THR 15L', dms(37, 29, 2.20), dms(126, 26, 24.56), 75]] },
+      { legs: [['BITIM', BITIM, BITIM_E, 3500], OLTEM, ['PUDIM', dms(37, 37, 54.2), dms(126, 18, 30.0), 3000]] },
+      // RWY HDG, 720 ft turn left HDG 108, NCN D8 turn right direct GC966, 4 000 ft
+      { ma: true, legs: [['THR 15L', dms(37, 29, 2.20), dms(126, 26, 24.56), 75], ['720 ft', 37.421498, 126.495651, 720, 'ap'],
+        ['NCN D8', 37.413030, 126.562966, 1210, 'ap'], GC966] },
+    ] },
+    { id: 'ILS16L', ops: 'dep', rwy: '16L', name: 'ILS RWY 16L', color: 0xf0abfc, paths: [
+      { legs: [['BITIM', BITIM, BITIM_E, 3500], ATKON, ['IPKOL', dms(37, 37, 7.4), dms(126, 17, 7.3), 3000], ['RUMRI', dms(37, 32, 12.9), dms(126, 21, 30.4), 1600],
+        ['THR 16L', dms(37, 28, 22.11), dms(126, 24, 56.05), 78]] },
+      { legs: [['MUNAN', MUNAN, MUNAN_E, 2000], ['IPKOL', dms(37, 37, 7.4), dms(126, 17, 7.3), 1600], ['RUMRI', dms(37, 32, 12.9), dms(126, 21, 30.4), 1600]] },
+      // RWY HDG, 500 ft turn right HDG 189, WNG D4 turn right direct DH989, 2 000 ft
+      { ma: true, legs: [['THR 16L', dms(37, 28, 22.11), dms(126, 24, 56.05), 78], ['500 ft', dms(37, 26, 36.29), dms(126, 26, 30.21), 500, 'ap'],
+        ['WNG D4', 37.366466, 126.441725, 1050, 'ap'], DH989] },
+    ] },
+    { id: 'ILS16R', ops: 'arr', rwy: '16R', name: 'ILS RWY 16R', color: 0xfde68a, paths: [
+      { legs: [['BITIM', BITIM, BITIM_E, 3500], ATKON, ['OLKIK', dms(37, 36, 59.6), dms(126, 16, 53.5), 3000], ['OSERI', dms(37, 31, 59.0), dms(126, 21, 22.1), 1600],
+        ['THR 16R', dms(37, 28, 7.71), dms(126, 24, 48.18), 78]] },
+      { legs: [['MUNAN', MUNAN, MUNAN_E, 2000], ['OLKIK', dms(37, 36, 59.6), dms(126, 16, 53.5), 1600], ['OSERI', dms(37, 31, 59.0), dms(126, 21, 22.1), 1600]] },
+      // RWY HDG, 500 ft turn right HDG 188, WNG D4 turn right direct DH989, 2 000 ft
+      { ma: true, legs: [['THR 16R', dms(37, 28, 7.71), dms(126, 24, 48.18), 78], ['500 ft', dms(37, 26, 28.50), dms(126, 26, 16.45), 500, 'ap'],
+        ['WNG D4', 37.366645, 126.439542, 1010, 'ap'], DH989] },
     ] },
   ],
   // AIP Republic of Korea RKSS AD CHART 2-29/30/32/34/37 (+ -1 data tabulation), ILS Z/Y RWY 14L, ILS RWY 14R/32L/32R,
@@ -151,7 +189,7 @@ export const PROCEDURES = {
 
 // Source line shown under Flight procedures, per airport
 export const PROC_NOTES = {
-  ICN: 'AIP RKSI AD 2-62 ~ 2-69, ILS or LOC CAT II & III (AMDT 13/25).',
+  ICN: 'AIP RKSI AD 2-51/55/58/60, 2-62 ~ 2-69, ILS RWY 15L/15R/16L/16R/33L/33R/34L/34R CAT II & III (AMDT 13/25, 2/26, 3/26).',
   RKSS: 'AIP RKSS AD 2-29/30/32/34/37, ILS RWY 14L/14R/32L/32R (AMDT 13/25, 2/26).',
   RKPC: 'AIP RKPC AD 2-21/22/26/27, ILS RWY 07/25 (AMDT 5/26).',
   RKPK: 'AIP RKPK AD 2-21, ILS X RWY 36L (AMDT 11/26).',

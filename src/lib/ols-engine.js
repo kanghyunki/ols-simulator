@@ -237,7 +237,7 @@ export function createEngine(canvas, cb) {
   function snapshot() {
     const ap = APID && AIRPORTS[APID];
     return { apId: APID, loading: !!ap && !ap.osm && !ap._failed, failed: !!ap && !!ap._failed, pending: texPending,
-      ap: AP ? { procs: (PROCEDURES[APID] || []).map(p => ({ id: p.id, name: p.name, color: p.color })), name: AP.name, sub: AP.sub, E: AP.E, code: AP.code || 4, origin: AP.osm.origin, ext: AP.ext || null, assume: AP.assume,
+      ap: AP ? { procs: (PROCEDURES[APID] || []).map(p => ({ id: p.id, name: p.name, color: p.color, rwy: p.rwy, ops: p.ops || null })), name: AP.name, sub: AP.sub, E: AP.E, code: AP.code || 4, origin: AP.osm.origin, ext: AP.ext || null, assume: AP.assume,
         rwys: AP.rwys.map((r, i) => ({ id: r.id, len: r.len, on: AP._on[i], nameA: r.nameA, nameB: r.nameB })),
         dem: AP.dem ? 'ok' : AP._demLoading ? 'loading' : AP._demFailed ? 'failed' : 'none', demSrc: AP.dem && AP.dem.src } : null,
       state: { ...state, surf: [...state.surf], extA: [...state.extA], extB: [...state.extB], par: state.par.map(p => ({ ...p })), scen: scen() } };
@@ -429,12 +429,13 @@ export function createEngine(canvas, cb) {
   // route (there is no SID data). Times are sped up (AIR m/s ≈ 12× an approach speed); each loops with a short pause.
   const AIR = 875, ROLL = 38, planes = [], planeMat = new Map();
   let planeGeo = null;
+  const finMat = color => { if (!planeMat.has(color)) planeMat.set(color, new THREE.MeshLambertMaterial({ color })); return planeMat.get(color); };
   function planeModel(color) {   // nose +Z, ~70 m span: about the procedure line's width
     if (!planeGeo) planeGeo = { body: new THREE.MeshLambertMaterial({ color: 0xf4f6f8 }),
       fus: new THREE.CylinderGeometry(4, 3, 58, 12).rotateX(Math.PI / 2), nose: new THREE.ConeGeometry(4, 11, 12).rotateX(Math.PI / 2).translate(0, 0, 34.5),
       wing: new THREE.BoxGeometry(70, 1.6, 11).translate(0, -1.5, 3), stab: new THREE.BoxGeometry(26, 1, 6).translate(0, 1, -25),
       fin: new THREE.BoxGeometry(1, 13, 8).translate(0, 7.5, -24) };
-    if (!planeMat.has(color)) planeMat.set(color, new THREE.MeshLambertMaterial({ color }));
+    finMat(color);
     const { body, fus, nose, wing, stab, fin } = planeGeo, g = new THREE.Group();
     for (const geo of [fus, nose, wing, stab]) g.add(new THREE.Mesh(geo, body));
     g.add(new THREE.Mesh(fin, planeMat.get(color))); return g; }
@@ -443,31 +444,52 @@ export function createEngine(canvas, cb) {
     for (let i = 1; i < nodes.length; i++) { const a = nodes[i - 1], b = nodes[i];
       t.push(t[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) / ((a[3] + b[3]) / 2)); }
     return { nodes, t, T: t[t.length - 1] }; }
+  // ops: 'arr' = arrivals only, 'dep' = departures only (the runway's role, e.g. Incheon). The shown procedures of such a
+  // runway share one stream that takes its ends in turn (both ends shown → the direction alternates): arrivals land on the
+  // procedure's end, departures take off from it and fly its missed-approach route. Departures follow each other as soon
+  // as the runway is clear, arrivals 3 s after the previous one has gone. Without ops, one lands and one takes off.
   function addPlanes(procs, add) { planes.length = 0;
+    const runs = new Map();                       // runway index + role → launches of the stream
     procs.forEach((pr, k) => { const ri = AP.rwys.findIndex(r => r.nameA === pr.rwy || r.nameB === pr.rwy); if (ri < 0) return;
       const rw = frames(scen() !== 'ex')[ri], atA = rw.nameA === pr.rwy, P0 = atA ? rw.A : rw.B, e = atA ? rw.eA : rw.eB,
-        dir = atA ? rw.U : [-rw.U[0], -rw.U[1]], mv = procShift(pr),
-        on = s => { const x = P0[0] + dir[0] * s, y = P0[1] + dir[1] * s; return [x, Math.max(e, demAt(x, y) ?? e), -y]; };   // on the terrain where it sits above the runway elevation
+        dir = atA ? rw.U : [-rw.U[0], -rw.U[1]], mv = procShift(pr);
+      // s metres from the threshold along the runway, on the terrain where it sits above the runway elevation
+      const on = s => { const x = P0[0] + dir[0] * s, y = P0[1] + dir[1] * s; return [x, Math.max(e, demAt(x, y) ?? e), -y]; };
       const legPts = (path, from = 0) => path.legs.slice(from).map(([, lat, lon, ft], i) => { const P = LL(AP, [lat, lon]), [x, y] = i + from || path.ma ? mv(P) : P;
         return [x, ft * 0.3048, -y, AIR, false]; });
       const app = pr.paths.find(p => !p.ma), ma = pr.paths.find(p => p.ma);
-      if (app) { const n = legPts(app); n.push([...on(300), AIR, true]);              // touchdown 300 m past the threshold, then roll out
-        for (let j = 1; j <= 6; j++) n.push([...on(300 + 250 * j), AIR + (ROLL - AIR) * j / 6, true]);
-        const o = planeModel(pr.color); add(o, scene); planes.push({ o, tr: track(n), off: k * 23 }); }
+      let land = null, dep = null;
+      if (app) { const n = legPts(app); n.push([...on(300), AIR, true]);            // touchdown 300 m past the threshold, then roll out
+        for (let j = 1; j <= 6; j++) n.push([...on(300 + 250 * j), AIR + (ROLL - AIR) * j / 6, true]); land = track(n); }
       if (ma) { const n = []; for (let j = 0; j <= 6; j++) n.push([...on(300 * j), ROLL + (AIR - ROLL) * j / 6, true]);   // roll 1 800 m, lift off
-        n.push(...legPts(ma, 1));
-        const o = planeModel(pr.color); add(o, scene); planes.push({ o, tr: track(n), off: k * 23 + 11 }); } }); }
+        dep = track([...n, ...legPts(ma, 1)]); }
+      const after = tr => ({ tr, gap: tr.T + 3, color: pr.color });                   // next one 3 s after this one is gone
+      const clear = tr => ({ tr, gap: tr.t[6] + Math.max(0, rw.L - 1800) / AIR + 1, color: pr.color });   // next one 1 s after this one passes the runway end
+      if (pr.ops === 'arr' || pr.ops === 'dep') { const key = ri + pr.ops, l = pr.ops === 'arr' ? land && after(land) : dep && clear(dep);
+        if (l) { if (!runs.has(key)) runs.set(key, { seq: [], off: k * 7 }); runs.get(key).seq.push(l); } }
+      else { if (land) fly([after(land)], k * 23); if (dep) fly([after(dep)], k * 23 + 11); } });
+    for (const { seq, off } of runs.values()) fly(seq, off);
+    // a stream: launches in turn, each `gap` s after the previous one; enough aircraft for the launches in the air at once
+    function fly(seq, off) { const n = Math.ceil(Math.max(...seq.map(q => q.tr.T)) / Math.min(...seq.map(q => q.gap))) + 1;
+      const pool = Array.from({ length: n }, () => { const o = planeModel(seq[0].color); add(o, scene); return o; }); planes.push({ pool, seq, off }); } }
   const _a = new THREE.Vector3(), _b = new THREE.Vector3();
   // Line-sized up close, growing with the camera distance (span ≈ 5 % of it) so it stays visible from the overview.
   // While smaller than the 22 m tube it rides on top of it; larger, it flies on the line. On the ground it sits on its wheels.
   function flyPlanes(now) { if (!planes.length) return; const zex = G.scale.y;
-    for (const p of planes) { const { nodes, t, T } = p.tr, tt = (now / 1000 + p.off) % (T + 3); p.o.visible = tt < T; if (!p.o.visible) continue;
+    for (const p of planes) { const cycle = p.seq.reduce((n, q) => n + q.gap, 0), t0 = (now / 1000 + p.off) % cycle;
+      const live = [];                                     // launches still in the air: this cycle's and earlier cycles'
+      for (let c = 0; c * cycle <= Math.max(...p.seq.map(q => q.tr.T)) + cycle; c++)
+        for (let j = 0, start = 0; j < p.seq.length; start += p.seq[j].gap, j++) { const age = t0 - start + c * cycle;
+          if (age >= 0 && age < p.seq[j].tr.T) live.push([p.seq[j].tr, age, p.seq[j].color]); }
+      p.live = live.length;
+      p.pool.forEach((o, n) => { o.visible = n < live.length; if (o.visible) { o.children[4].material = finMat(live[n][2]); flyOne(o, live[n][0], live[n][1], zex); } }); } }
+  function flyOne(o, tr, tt, zex) { const { nodes, t } = tr;
       let i = 1; while (i < t.length - 1 && t[i] < tt) i++;
       const f = Math.min(1, (tt - t[i - 1]) / (t[i] - t[i - 1] || 1)), a = nodes[i - 1], b = nodes[i];
-      _a.set(a[0], a[1] * zex, a[2]); _b.set(b[0], b[1] * zex, b[2]); p.o.position.lerpVectors(_a, _b, f);
-      const k = Math.max(1, 0.05 * camera.position.distanceTo(p.o.position) / 70), lift = (n) => (n[4] ? 5 * k : Math.max(0, 22 * zex + 5 - 4 * k));
-      p.o.scale.setScalar(k); p.o.position.y += lift(a) + (lift(b) - lift(a)) * f; _b.y += lift(b);
-      if (p.o.position.distanceToSquared(_b) > 1) p.o.lookAt(_b); } }
+      _a.set(a[0], a[1] * zex, a[2]); _b.set(b[0], b[1] * zex, b[2]); o.position.lerpVectors(_a, _b, f);
+      const k = Math.max(1, 0.05 * camera.position.distanceTo(o.position) / 70), lift = (n) => (n[4] ? 5 * k : Math.max(0, 22 * zex + 5 - 4 * k));
+      o.scale.setScalar(k); o.position.y += lift(a) + (lift(b) - lift(a)) * f; _b.y += lift(b);
+      if (o.position.distanceToSquared(_b) > 1) o.lookAt(_b); }
 
   function sync() { if (!alive || !AP) return;
     const rwsEx = frames(false), rwsExt = frames(true), rws = scen() === 'ext' ? rwsExt : rwsEx;
@@ -528,6 +550,6 @@ export function createEngine(canvas, cb) {
   function destroy() { alive = false; canvas.removeEventListener('pointermove', onMove); ctl.dispose(); renderer.dispose(); }
 
   resize(); loop();
-  const debug = () => ({ planes: planes.map(p => ({ T: Math.round(p.tr.T), n: p.tr.nodes.length, vis: p.o.visible, pos: p.o.position.toArray().map(Math.round) })), pending: texPending, K: { ...K }, texW: texCv.width, texH: texCv.height, hsW: hsCv.width, tex: texCv.toDataURL('image/jpeg', .5), hs: hsCv.width ? hsCv.toDataURL('image/jpeg', .5) : null });
+  const debug = () => ({ planes: planes.map(p => ({ T: p.seq.map(q => Math.round(q.tr.T)), gap: p.seq.map(q => +q.gap.toFixed(1)), pool: p.pool.length, live: p.live, pos: p.pool.filter(o => o.visible).map(o => o.position.toArray().map(Math.round)) })), pending: texPending, K: { ...K }, texW: texCv.width, texH: texCv.height, hsW: hsCv.width, tex: texCv.toDataURL('image/jpeg', .5), hs: hsCv.width ? hsCv.toDataURL('image/jpeg', .5) : null });
   return { switchAirport, set, setExt, setRunway, fit, resize, destroy, snapshot, stats, debug };
 }
