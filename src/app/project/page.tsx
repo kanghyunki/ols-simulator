@@ -6,14 +6,14 @@ import { Reveal } from "@/components/reveal";
 import { useT } from "@/lib/lang";
 
 // Project: the airport projects OLS Simulator grew out of. Organisations are named in text, not with their logos
-// (official marks need each owner's permission).
+// (official marks need each owner's permission). Newest first.
 const PROJECTS = [
-  ["2016", "Ulleung Airport", "Basic Design for the Ulleung Airport Construction Project", "Busan Regional Aviation Administration", "울릉공항", "울릉공항 건설사업 기본설계", "부산지방항공청", "~2018", "~2018"],
-  ["2017", "Incheon International Airport", "Phase 4 Basic and Detail Design", "IIAC project", "인천국제공항", "4단계 기본 및 실시설계", "인천국제공항공사 사업", "~2022", "~2022"],
-  ["2022", "Incheon International Airport", "Mid- to Long-term Development Strategy Review for Post-COVID Changes", "IIAC project", "인천국제공항", "포스트 코로나 등 환경변화에 따른\n인천국제공항 중장기 개발전략 재정비 용역", "인천국제공항 사업", "~2024", "~2024"],
-  ["2024", "Beira & Pemba Airports, Mozambique", "Modernisation Feasibility Study", "Korea Eximbank project", "모잠비크 베이라·펨바 공항", "현대화 사업 타당성조사", "한국수출입은행 사업", "~2025", "~2025"],
-  ["2025", "Papua New Guinea CADIP-II", "Detailed Design and Construction Supervision", "Asian Development Bank project", "파푸아뉴기니 CADIP-II", "실시설계 및 감리", "아시아개발은행(ADB) 사업", "~Ongoing", "~진행중"],
   ["2026", "Papua New Guinea CADIP-II", "Master Plan", "Asian Development Bank project", "파푸아뉴기니 CADIP-II", "마스터플랜", "아시아개발은행(ADB) 사업", "~Ongoing", "~진행중"],
+  ["2025", "Papua New Guinea CADIP-II", "Detailed Design and Construction Supervision", "Asian Development Bank project", "파푸아뉴기니 CADIP-II", "실시설계 및 감리", "아시아개발은행(ADB) 사업", "~Ongoing", "~진행중"],
+  ["2024", "Beira & Pemba Airports, Mozambique", "Modernisation Feasibility Study", "Korea Eximbank project", "모잠비크 베이라·펨바 공항", "현대화 사업 타당성조사", "한국수출입은행 사업", "~2025", "~2025"],
+  ["2022", "Incheon International Airport", "Mid- to Long-term Development Strategy Review for Post-COVID Changes", "IIAC project", "인천국제공항", "포스트 코로나 등 환경변화에 따른\n인천국제공항 중장기 개발전략 재정비 용역", "인천국제공항 사업", "~2024", "~2024"],
+  ["2017", "Incheon International Airport", "Phase 4 Basic and Detail Design", "IIAC project", "인천국제공항", "4단계 기본 및 실시설계", "인천국제공항공사 사업", "~2022", "~2022"],
+  ["2016", "Ulleung Airport", "Basic Design for the Ulleung Airport Construction Project", "Busan Regional Aviation Administration", "울릉공항", "울릉공항 건설사업 기본설계", "부산지방항공청", "~2018", "~2018"],
 ];
 
 export default function ProjectPage() {
