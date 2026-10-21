@@ -37,14 +37,13 @@ const tagKo = (n: string) => n.replace(/^(.*?)( \(assumed height\))?$/, (_, a, b
 const regionCountries = (region: string) => [...new Set(Object.values(AIRPORTS as Record<string, any>).filter((a) => a.region === region).map(countryOf))].sort();
 
 // Left icon rail: each icon opens its panel beside the rail (the same icon again closes it); a bottom tab bar on phones
-type Tab = "ols" | "plan" | "proc" | "check" | "map" | "info" | "report";
+type Tab = "ols" | "plan" | "proc" | "check" | "info" | "report";
 const ic = (d: string) => <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d={d} /></svg>;
 const TABS: [Tab, string, string, React.ReactNode][] = [
   ["ols", "Obstacle surfaces", "장애물제한표면", ic("M10 3l7 3.5-7 3.5-7-3.5zM3 10l7 3.5 7-3.5M3 13.5L10 17l7-3.5")],
   ["plan", "Planning", "계획하기", ic("M3 14l9-9 3 3-9 9H3zM10.5 6.5l3 3M15 3v4M13 5h4")],
   ["proc", "Flight procedures", "비행절차", ic("M10 2.5c.8 0 1.2.9 1.2 2v3.7l5.3 3v1.6l-5.3-1.6v3.3l1.8 1.4v1.3L10 16.5l-3 .7v-1.3l1.8-1.4v-3.3L3.5 12.8v-1.6l5.3-3V4.5c0-1.1.4-2 1.2-2z")],
   ["check", "Review", "검토", ic("M10 2.5l6 2.5v4.5c0 3.6-2.5 6.4-6 8-3.5-1.6-6-4.4-6-8V5zM10 7v3.5M10 13v.01")],
-  ["map", "Map and view", "지도·보기", ic("M2.5 5.5l5-2 5 2 5-2v11l-5 2-5-2-5 2zM7.5 3.5v11M12.5 5.5v11")],
   ["info", "Data and assumptions", "자료·가정", ic("M10 17.5a7.5 7.5 0 100-15 7.5 7.5 0 000 15zM10 9v5M10 6.5v.01")],
   ["report", "Report", "보고서", ic("M5.5 2.5h6l4 4v11h-10zM11.5 2.5v4h4M8 11l2 2 2-2M10 8.5V13")],
 ];
@@ -87,6 +86,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
   const [tab, setTab] = useState<Tab | null>(null);   // open panel; none on phones at first, so the 3D view shows
   useEffect(() => { if (matchMedia("(min-width: 768px)").matches) setTab("ols"); }, []);
   const [stats, setStats] = useState<any>(null);       // Review / Report: penetrations of the current scenario
+  const [layerOpen, setLayerOpen] = useState(false);   // bottom-left layer switcher: unfolds on hover (tap on phones)
   // Top picker: folded to one line; unfolds on hover / focus / click, folds again once an airport is picked
   // (hold keeps it folded under the pointer until the pointer leaves)
   const [pickOpen, setPickOpen] = useState(false), [pickHold, setPickHold] = useState(false);
@@ -139,6 +139,14 @@ export function Simulator({ onHome }: { onHome: () => void }) {
     <Column label={t("Country", "국가")} rows={rows} items={regionCountries(region).map((c) => [c, countryName(c)])} value={country} onPick={setCountry} empty={t("No airports yet", "아직 공항이 없습니다")} />
     <Column label={t("Airport", "공항")} rows={rows} items={airports.map(([k, a]) => [k, airportName(a) ?? k])} value={snap?.apId ?? ""} onPick={(k) => { eng.current?.switchAirport(k); picked?.(); }} />
   </>;
+  // Layer thumbnails: the zoom-13 tile under the airport from each provider
+  const LAYERS: [string, string, string][] = [["sat", "Satellite", "위성"], ["osm", "Map", "지도"], ["none", "None", "없음"]];
+  const thumb = (k: string) => { if (!ap || k === "none") return null; const z = 13, n = 2 ** z, [la, lo] = ap.origin, r = la * Math.PI / 180;
+    const x = Math.floor((lo + 180) / 360 * n), y = Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n);
+    return k === "sat" ? `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}` : `https://tile.openstreetmap.org/${z}/${x}/${y}.png`; };
+  const swatch = (k: string, cls: string) => { const u = thumb(k);
+    // eslint-disable-next-line @next/next/no-img-element
+    return u ? <img src={u} alt="" className={`${cls} object-cover`} /> : <span className={`${cls} bg-[linear-gradient(135deg,#1b1e24,#2a2d33)]`} />; };
   const cur = snap?.apId ? (AIRPORTS as any)[snap.apId] : null;
   const fold = () => { setPickOpen(false); setPickHold(false); if (cur) { setRegion(cur.region); setCountry(countryOf(cur)); } };   // back to the airport on show
   const unfolded = pickOpen && !pickHold;
@@ -150,9 +158,6 @@ export function Simulator({ onHome }: { onHome: () => void }) {
       {/* top bar */}
       <div className="pointer-events-none absolute top-0 right-0 left-0 flex items-center justify-between px-7 py-4 text-[11.5px] text-white/60 md:pl-[76px] max-md:px-3 max-md:py-2.5">
         <span className="flex items-center gap-3">
-          <button type="button" onClick={onHome} className="pointer-events-auto flex items-center gap-1.5 text-[13px] font-medium text-white/80 transition hover:text-white">
-            <svg viewBox="0 0 20 20" className="size-4" aria-hidden><path d="M16 10H4M9 5l-5 5 5 5" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>{t("Home", "홈")}
-          </button>
         </span>
         <span className="flex items-center gap-4">
           {ap && <span className="text-white/80 max-md:hidden">{ap.sub}</span>}
@@ -180,7 +185,12 @@ export function Simulator({ onHome }: { onHome: () => void }) {
       </div>
 
       {/* icon rail (left edge; bottom tab bar on phones) */}
-      <nav aria-label={t("Panels", "패널")} className="absolute top-0 bottom-0 left-0 z-10 flex w-[52px] flex-col items-center gap-1 border-r border-white/10 bg-[#0b0d10]/85 pt-16 backdrop-blur max-md:top-auto max-md:right-0 max-md:h-14 max-md:w-auto max-md:flex-row max-md:justify-around max-md:border-t max-md:border-r-0 max-md:pt-0">
+      <nav aria-label={t("Panels", "패널")} className="absolute top-0 bottom-0 left-0 z-10 flex w-[52px] flex-col items-center gap-1 border-r border-white/10 bg-[#0b0d10]/85 pt-3 backdrop-blur max-md:top-auto max-md:right-0 max-md:h-14 max-md:w-auto max-md:flex-row max-md:justify-around max-md:border-t max-md:border-r-0 max-md:pt-0">
+        <button type="button" title={t("Home", "홈")} aria-label={t("Home", "홈")} onClick={onHome}
+          className="grid size-10 place-items-center rounded-lg text-white/70 transition hover:bg-white/[.06] hover:text-white">
+          {ic("M3 9.5L10 3.5l7 6M5 8v8.5h3.5v-5h3v5H15V8")}
+        </button>
+        <span className="my-2 h-px w-6 bg-white/10 max-md:mx-0 max-md:my-0 max-md:h-6 max-md:w-px" />
         {TABS.map(([k, en, kr, icon]) => (
           <button key={k} type="button" title={t(en, kr)} aria-label={t(en, kr)} aria-pressed={tab === k} onClick={() => setTab(tab === k ? null : k)}
             className={`relative grid size-10 place-items-center rounded-lg transition ${tab === k ? "bg-white/12 text-white" : "text-white/55 hover:bg-white/[.06] hover:text-white"}`}>
@@ -192,7 +202,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
 
       {/* panel of the selected icon */}
       {tab && (
-        <div className="absolute top-14 left-[64px] z-10 max-h-[calc(100%-6rem)] w-[310px] overflow-y-auto rounded-xl border border-white/10 bg-[#0b0d10]/80 px-4 pt-3 pb-4 backdrop-blur [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,.15)_transparent] max-md:inset-x-0 max-md:top-auto max-md:bottom-14 max-md:left-0 max-md:w-auto max-md:max-h-[55vh] max-md:rounded-none max-md:rounded-t-2xl max-md:border-x-0">
+        <div className="absolute top-14 left-[64px] z-10 max-h-[calc(100%-11rem)] w-[310px] overflow-y-auto rounded-xl border border-white/10 bg-[#0b0d10]/80 px-4 pt-3 pb-4 backdrop-blur [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,.15)_transparent] max-md:inset-x-0 max-md:top-auto max-md:bottom-14 max-md:left-0 max-md:w-auto max-md:max-h-[55vh] max-md:rounded-none max-md:rounded-t-2xl max-md:border-x-0">
           <div className="mb-3 flex items-center justify-between">
             <span className="text-[14px] font-semibold text-white">{(() => { const x = TABS.find(([k]) => k === tab)!; return t(x[1], x[2]); })()}</span>
             <button type="button" aria-label={t("Close", "닫기")} onClick={() => setTab(null)} className="grid size-7 place-items-center rounded text-white/45 transition hover:bg-white/[.06] hover:text-white">
@@ -322,26 +332,6 @@ export function Simulator({ onHome }: { onHome: () => void }) {
             </div>}
           </>}
 
-          {tab === "map" && <>
-        <div className="flex flex-wrap gap-1.5">
-          <Button size="xs" className={pill} onClick={() => eng.current?.fit("all")}>{t("Overview", "전체")}</Button>
-          <Button size="xs" className={pill} onClick={() => eng.current?.fit("rwy")}>{t("Runway", "활주로")}</Button>
-          <Button size="xs" className={pill} onClick={() => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen())}>{fs ? t("Exit full screen", "전체 화면 종료") : t("Full screen", "전체 화면")}</Button>
-          <Toggle size="sm" className={pill} pressed={!!st?.rot} onPressedChange={(v) => set({ rot: v })}>{t("Auto-rotate", "자동 회전")}</Toggle>
-        </div>
-
-            <H>{t("Ground", "바닥")}</H>
-            <ToggleGroup type="single" value={st?.base ?? "sat"} onValueChange={(v) => v && set({ base: v })} className="justify-start gap-1.5">
-              <ToggleGroupItem value="sat" size="sm" className={pill}>{t("Satellite", "위성")}</ToggleGroupItem>
-              <ToggleGroupItem value="osm" size="sm" className={pill}>{t("OSM", "지도")}</ToggleGroupItem>
-              <ToggleGroupItem value="none" size="sm" className={pill}>{t("None", "없음")}</ToggleGroupItem>
-            </ToggleGroup>
-            <H>{t("Vertical exaggeration", "수직 과장")}</H>
-            <ToggleGroup type="single" value={String(st?.zex ?? 1)} onValueChange={(v) => v && set({ zex: +v })} className="justify-start gap-1.5">
-              {[1, 2, 5, 10].map((z) => <ToggleGroupItem key={z} value={String(z)} size="sm" className={pill}>{z}×</ToggleGroupItem>)}
-            </ToggleGroup>
-          </>}
-
           {tab === "info" && <>
         {ap && <Note>{ap.sub} · {t(`AD ${ap.E} m AMSL`, `공항표고 ${ap.E} m`)} · Annex 14 {t("code", "코드")} {ap.code} · {ap.dem === "ok" ? t("terrain loaded", "지형 불러옴") : ap.dem === "loading" ? t("terrain loading…", "지형 불러오는 중…") : ap.dem === "failed" ? t("terrain unavailable", "지형 사용 불가") : t("terrain none", "지형 없음")}</Note>}
 
@@ -389,8 +379,42 @@ export function Simulator({ onHome }: { onHome: () => void }) {
         </div>
       </div>
 
-      <div className="absolute right-7 bottom-9 flex flex-col items-end gap-2 max-md:hidden">
-        <span className="pointer-events-none mt-1 font-mono text-[11.5px] tracking-wide text-white/60">{ap ? `${Math.abs(ap.origin[0]).toFixed(4)}°${ap.origin[0] < 0 ? "S" : "N"}  ${Math.abs(ap.origin[1]).toFixed(4)}°${ap.origin[1] < 0 ? "W" : "E"}` : ""}</span>
+      {/* bottom left: layer switcher (current layer; the choices unfold beside it) */}
+      <div className="absolute bottom-10 left-[68px] z-10 flex items-end gap-2 max-md:bottom-[72px] max-md:left-3"
+        onMouseEnter={() => setLayerOpen(true)} onMouseLeave={() => setLayerOpen(false)}>
+        <button type="button" aria-expanded={layerOpen} onClick={() => setLayerOpen((o) => !o)} title={t("Layers", "레이어")}
+          className="relative size-[68px] overflow-hidden rounded-xl border-2 border-white/70 shadow-lg transition hover:border-white">
+          {swatch(st?.base ?? "sat", "absolute inset-0 size-full")}
+          <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-gradient-to-t from-black/85 to-transparent pt-4 pb-1 text-[11px] font-medium text-white">
+            <svg viewBox="0 0 20 20" className="size-3" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><path d="M10 3l7 3.5-7 3.5-7-3.5zM3 10l7 3.5 7-3.5" /></svg>{t("Layers", "레이어")}
+          </span>
+        </button>
+        <div className={`flex gap-2.5 overflow-hidden rounded-xl bg-[#0b0d10]/85 backdrop-blur transition-all duration-200 ${layerOpen ? "max-w-[260px] border border-white/10 px-3 py-2 opacity-100" : "pointer-events-none max-w-0 border-0 p-0 opacity-0"}`}>
+          {LAYERS.map(([k, en, kr]) => (
+            <button key={k} type="button" onClick={() => set({ base: k })} className="flex shrink-0 flex-col items-center gap-1 text-[11px] text-white/70 transition hover:text-white">
+              <span className={`relative size-12 overflow-hidden rounded-lg border-2 ${st?.base === k ? "border-[#4f7dff]" : "border-transparent"}`}>{swatch(k, "absolute inset-0 size-full")}</span>
+              <span className={st?.base === k ? "text-white" : ""}>{t(en, kr)}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* bottom right: view and elevation scale, above the coordinates */}
+      <div className="absolute right-7 bottom-9 z-10 flex flex-col items-end gap-2 max-md:right-3 max-md:bottom-[152px]">
+        <div className="rounded-xl border border-white/10 bg-[#0b0d10]/80 p-2.5 backdrop-blur max-md:max-w-[calc(100vw-108px)]">
+          <div className="mb-1.5 text-[11px] text-white/50">{t("View", "화면 선택")}</div>
+          <div className="flex flex-wrap gap-1.5">
+            <Button size="xs" className={pill} onClick={() => eng.current?.fit("all")}>{t("Overview", "전체")}</Button>
+            <Button size="xs" className={pill} onClick={() => eng.current?.fit("rwy")}>{t("Runway", "활주로")}</Button>
+            <Button size="xs" className={`${pill} max-md:hidden`} onClick={() => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen())}>{fs ? t("Exit full screen", "전체 화면 종료") : t("Full screen", "전체 화면")}</Button>
+            <Toggle size="sm" className={pill} pressed={!!st?.rot} onPressedChange={(v) => set({ rot: v })}>{t("Auto-rotate", "자동 회전")}</Toggle>
+          </div>
+          <div className="mt-2.5 mb-1.5 text-[11px] text-white/50">{t("Elevation scale", "고도 배율")}</div>
+          <ToggleGroup type="single" value={String(st?.zex ?? 1)} onValueChange={(v) => v && set({ zex: +v })} className="justify-start gap-1.5">
+            {[1, 2, 5, 10].map((z) => <ToggleGroupItem key={z} value={String(z)} size="sm" className={pill}>{z}×</ToggleGroupItem>)}
+          </ToggleGroup>
+        </div>
+        <span className="pointer-events-none mt-1 font-mono max-md:hidden text-[11.5px] tracking-wide text-white/60">{ap ? `${Math.abs(ap.origin[0]).toFixed(4)}°${ap.origin[0] < 0 ? "S" : "N"}  ${Math.abs(ap.origin[1]).toFixed(4)}°${ap.origin[1] < 0 ? "W" : "E"}` : ""}</span>
       </div>
       <div className="pointer-events-none absolute right-7 bottom-3 left-[76px] flex justify-between text-[10.5px] text-white/35 max-md:inset-x-3 max-md:bottom-[60px] max-md:text-[9px]">
         <span className="max-md:hidden">{t("Drag to orbit · scroll to zoom · right-drag to pan · hover a building for its clearance", "드래그: 회전 · 스크롤: 확대·축소 · 오른쪽 드래그: 이동 · 건물에 마우스를 올리면 여유고 표시")}</span>

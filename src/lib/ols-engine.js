@@ -54,7 +54,7 @@ export function createEngine(canvas, cb) {
   // par: added parallel runways [{ ri, off, len }] — a copy of runway `ri` shifted `off` m to its left (A→B; negative = right),
   // centred on the reference, `len` m long (default: the reference length), same threshold elevations
   const state = { showEx: false, extA: [], extB: [], par: [], E: 39, base: 'sat', pen: true, obs: true, ofz: false, proc: [], bldH: 6,
-    surf: new Set(ALL_KEYS), rot: true, zex: 2 };   // zex: vertical exaggeration, 2× by default so relief reads at 1:1-ish views
+    surf: new Set(ALL_KEYS), rot: true, zex: 5 };   // zex: vertical exaggeration, 5× by default so relief and the surfaces' slopes read at airport scale
 
   // ---------- coordinates / geometry core (per-runway frames) ----------
   function initAp(ap) { if (!ap._k) { const lat0 = ap.osm.origin[0]; ap._k = [111320 * Math.cos(lat0 * Math.PI / 180), 110574]; }
@@ -289,12 +289,24 @@ export function createEngine(canvas, cb) {
     for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const all = olsAll([ex.x1 + i * step, ex.y1 + j * step], rws);
       for (const k in all) (H[k] || (H[k] = new Float32Array(nx * ny).fill(NaN)))[j * nx + i] = all[k]; }
     return { nx, ny, H }; }
-  function meshFrom(ex, step, nx, ny, h, color) {
-    const pos = new Float32Array(nx * ny * 3);
-    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; pos[3 * k] = ex.x1 + i * step; pos[3 * k + 1] = isNaN(h[k]) ? 0 : h[k]; pos[3 * k + 2] = -(ex.y1 + j * step); }
+  // Grid cells wholly on the surface are two triangles. A cell the surface's edge runs through keeps only its part on the
+  // surface: on each cell side where the surface starts or stops, the edge point is found by bisection (≈8 cm), and the
+  // corners on the surface plus those points make the cell's polygon — so the surface ends on a line, not in 80 m steps.
+  function meshFrom(ex, step, nx, ny, h, color, key, rws) {
+    const pos = []; for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; pos.push(ex.x1 + i * step, isNaN(h[k]) ? 0 : h[k], -(ex.y1 + j * step)); }
+    const at = (x, y) => olsAll([x, y], rws)[key], cut = new Map();
+    const edgePt = (p, q) => { const id = p < q ? p + ',' + q : q + ',' + p; if (cut.has(id)) return cut.get(id);   // p on the surface, q off it
+      let x0 = ex.x1 + (p % nx) * step, y0 = ex.y1 + Math.floor(p / nx) * step, x1 = ex.x1 + (q % nx) * step, y1 = ex.y1 + Math.floor(q / nx) * step, hv = h[p];
+      for (let n = 0; n < 10; n++) { const xm = (x0 + x1) / 2, ym = (y0 + y1) / 2, v = at(xm, ym); if (v === undefined) { x1 = xm; y1 = ym; } else { x0 = xm; y0 = ym; hv = v; } }
+      const v = pos.length / 3; pos.push(x0, hv, -y0); cut.set(id, v); return v; };
     const idx = []; for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) { const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
-      if (!isNaN(h[a]) && !isNaN(h[b]) && !isNaN(h[c]) && !isNaN(h[d])) idx.push(a, c, b, b, c, d); }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+      const on = [a, b, d, c].map(v => !isNaN(h[v])), n = on.filter(Boolean).length; if (!n) continue;
+      if (n === 4) { idx.push(a, c, b, b, c, d); continue; }
+      const ring = [a, b, d, c], poly = [];                                  // walk the cell's corners in order
+      for (let e = 0; e < 4; e++) { const p = ring[e], q = ring[(e + 1) % 4], op = on[e], oq = on[(e + 1) % 4];
+        if (op) poly.push(p); if (op !== oq) poly.push(op ? edgePt(p, q) : edgePt(q, p)); }
+      for (let t = 1; t < poly.length - 1; t++) idx.push(poly[0], poly[t + 1], poly[t]); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
     return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, transparent: true, opacity: .5, side: THREE.DoubleSide, depthWrite: false })); }
   function linesFrom(ex, step, nx, ny, h, stride) {
     const v = [], at = (i, j) => h[j * nx + i];
@@ -335,7 +347,7 @@ export function createEngine(canvas, cb) {
           const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: uni ?? COLOR[k], transparent: true, opacity: uni ? .3 : .5, side: THREE.DoubleSide, depthWrite: false }));
           G.add(m); L.surf.push(m); const gl = new THREE.LineSegments(e, lineMat()); G.add(gl); L.grid.push(gl); continue; }
         const h = H[k]; if (!h) continue;
-        const m = meshFrom(ex, step, nx, ny, h, uni ?? COLOR[k]); if (uni) m.material.opacity = .3; G.add(m); L.surf.push(m);
+        const m = meshFrom(ex, step, nx, ny, h, uni ?? COLOR[k], k, rws); if (uni) m.material.opacity = .3; G.add(m); L.surf.push(m);
         const gl = linesFrom(ex, step, nx, ny, h, 5); G.add(gl); L.grid.push(gl); } } }
   function buildGround() {
     if (L.ground) { G.remove(L.ground); L.ground.geometry.dispose(); }
@@ -590,6 +602,8 @@ export function createEngine(canvas, cb) {
   function destroy() { alive = false; canvas.removeEventListener('pointermove', onMove); ctl.dispose(); renderer.dispose(); }
 
   resize(); loop();
+  // console probes for terrain checks: __ols.probe.dem(x, y), __ols.probe.ols(x, y), __ols.probe.xy(lat, lon)
+  const probe = { dem: (x, y) => demAt(x, y), ols: (x, y) => ols([x, y], frames(true)), xy: (lat, lon) => LL(AP, [lat, lon]), rws: () => frames(false).map(f => ({ A: f.A, B: f.B, eA: f.eA, eB: f.eB })), demInfo: () => AP.dem && { src: AP.dem.src, dx: AP.dem.dx, dy: AP.dem.dy, nx: AP.dem.nx, ny: AP.dem.ny } };
   const debug = () => ({ hi: { on: hiU.hiOn.value, rect: hiU.hiRect.value.toArray().map(Math.round), w: hiCv.width, h: hiCv.height, img: hiCv.width ? hiCv.toDataURL('image/jpeg', .4) : null, mat: !!L.ground?.material.onBeforeCompile }, planes: planes.map(p => ({ T: p.seq.map(q => Math.round(q.tr.T)), gap: p.seq.map(q => +q.gap.toFixed(1)), pool: p.pool.length, live: p.live, pos: p.pool.filter(o => o.visible).map(o => o.position.toArray().map(Math.round)) })), pending: texPending, K: { ...K }, texW: texCv.width, texH: texCv.height, hsW: hsCv.width, tex: texCv.toDataURL('image/jpeg', .5), hs: hsCv.width ? hsCv.toDataURL('image/jpeg', .5) : null });
-  return { switchAirport, set, setExt, setRunway, fit, resize, destroy, snapshot, stats, debug };
+  return { switchAirport, set, setExt, setRunway, fit, resize, destroy, snapshot, stats, debug, probe };
 }
