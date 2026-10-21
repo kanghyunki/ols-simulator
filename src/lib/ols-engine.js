@@ -31,6 +31,7 @@ function rampG(t, st) { t = Math.max(0, Math.min(1, t));
   for (let i = 1; i < st.length; i++) { if (t <= st[i][0]) { const f = (t - st[i - 1][0]) / (st[i][0] - st[i - 1][0]); const a = st[i - 1][1], b = st[i][1]; return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f]; } }
   return st[st.length - 1][1]; }
 
+const FILM = 0.15;   // dark film over the imagery so the surfaces read (was 0.3)
 const TILE_PROV = {
   osm: { url: (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`, attr: '© OpenStreetMap contributors', max: 19 },
   sat: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, attr: 'Imagery © Esri, Maxar', max: 19 },
@@ -257,6 +258,22 @@ export function createEngine(canvas, cb) {
   const K = {};
   let alive = true, texPending = false, syncQueued = false;
   const texCv = document.createElement('canvas'), ovCv = document.createElement('canvas'), hsCv = document.createElement('canvas');
+  // Detail patch: imagery 2 km around the runways (airport hiImg overrides the margin, 0 turns it off) at up to tile zoom 16
+  // (~2 m/px, in at most 4096 px) in a texture of its own, which the ground shader uses inside that rectangle instead of the
+  // airport-wide texture (~15 m/px).
+  const hiCv = document.createElement('canvas'), hiU = { hiMap: { value: null }, hiRect: { value: new THREE.Vector4() }, hiOn: { value: 0 } };
+  let hiTex = null, hiAt = 0, hiTimer = 0, hiPending = false;
+  const groundMat = () => { const m = new THREE.MeshLambertMaterial({ map: tex });
+    m.onBeforeCompile = (sh) => { Object.assign(sh.uniforms, hiU);
+      sh.vertexShader = 'uniform vec4 hiRect;\nvarying vec2 vHiUv;\n' + sh.vertexShader.replace('#include <begin_vertex>',
+        '#include <begin_vertex>\nvHiUv = vec2((position.x - hiRect.x) / (hiRect.z - hiRect.x), (-position.z - hiRect.y) / (hiRect.w - hiRect.y));');
+      sh.fragmentShader = 'uniform sampler2D hiMap;\nuniform float hiOn;\nvarying vec2 vHiUv;\n' + sh.fragmentShader.replace('#include <map_fragment>',
+        `#ifdef USE_MAP
+          vec4 sampledDiffuseColor = texture2D( map, vMapUv );
+          if ( hiOn > 0.5 && all( greaterThan( vHiUv, vec2( 0.0 ) ) ) && all( lessThan( vHiUv, vec2( 1.0 ) ) ) ) sampledDiffuseColor = texture2D( hiMap, vHiUv );
+          diffuseColor *= sampledDiffuseColor;
+        #endif`); };
+    return m; };
   let tex = null;   // CanvasTexture, recreated on every texture rebuild (re-uploading a resized canvas into one texture proved unreliable)
 
   function clear(list) { list.forEach(m => { G.remove(m); m.geometry.dispose(); }); list.length = 0; }
@@ -329,7 +346,7 @@ export function createEngine(canvas, cb) {
     for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const x = ex.x1 + (ex.x2 - ex.x1) * i / (nx - 1), y = ex.y2 - (ex.y2 - ex.y1) * j / (ny - 1);
       const z = D ? Math.max(0, demAt(x, y) ?? 0) : state.E; p.setXYZ(j * nx + i, x, z, -y); }
     g.computeVertexNormals();
-    L.ground = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: tex })); L.groundEx = ex; G.add(L.ground); buildHillshade(); }
+    L.ground = new THREE.Mesh(g, groundMat()); L.groundEx = ex; G.add(L.ground); buildHillshade(); }
   // Hillshade from the DEM (sun NW, 40° up, relief ×2), multiplied into the ground texture so slopes read even at 1×.
   function buildHillshade() { const D = AP.dem, ex = L.groundEx; hsCv.width = hsCv.height = 0; if (!D) return;
     const W = 1024, H = Math.max(64, Math.round(W * (ex.y2 - ex.y1) / (ex.x2 - ex.x1))); hsCv.width = W; hsCv.height = H;
@@ -355,11 +372,34 @@ export function createEngine(canvas, cb) {
       for (let tx = tx0; tx <= tx1; tx++) for (let ty = ty0; ty <= ty1; ty++) { const img = tileGet(state.base, z, tx, ty); if (!img) { texPending = true; continue; }
         const xa = (tx2lon(tx, z) - lo0) * kx, xb = (tx2lon(tx + 1, z) - lo0) * kx, yt = (ty2lat(ty, z) - la0) * ky, yb = (ty2lat(ty + 1, z) - la0) * ky;
         tc.drawImage(img, (xa - ex.x1) / mpp, (ex.y2 - yt) / mpp, (xb - xa) / mpp, (yt - yb) / mpp); }
-      tc.fillStyle = 'rgba(8,10,14,.3)'; tc.fillRect(0, 0, W, H); }
+      tc.fillStyle = `rgba(8,10,14,${FILM})`; tc.fillRect(0, 0, W, H); }
     if (hsCv.width) { tc.globalCompositeOperation = 'multiply'; tc.drawImage(hsCv, 0, 0, W, H); tc.globalCompositeOperation = 'source-over'; }
     tc.drawImage(ovCv, 0, 0, W, H);
     if (tex) tex.dispose(); tex = new THREE.CanvasTexture(texCv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-    if (L.ground) { L.ground.material.map = tex; L.ground.material.needsUpdate = true; } }
+    if (L.ground) { L.ground.material.map = tex; L.ground.material.needsUpdate = true; }
+    buildHi(); }
+  function buildHi() { hiPending = false; const m = AP.hiImg ?? 2000; if (!m || state.base === 'none' || !L.groundEx) { hiU.hiOn.value = 0; return; }
+    const now = performance.now(); if (now - hiAt < 700) { hiPending = true; clearTimeout(hiTimer); hiTimer = setTimeout(scheduleSync, 750); return; }   // tiles stream in: at most every 0.7 s
+    hiAt = now; const ex0 = L.groundEx, ends = frames(false).flatMap(f => [f.A, f.B]);   // the runways' own box, not the OLS extent
+    const r = { x1: Math.min(...ends.map(q => q[0])), x2: Math.max(...ends.map(q => q[0])), y1: Math.min(...ends.map(q => q[1])), y2: Math.max(...ends.map(q => q[1])) };
+    const ex = { x1: Math.max(ex0.x1, r.x1 - m), x2: Math.min(ex0.x2, r.x2 + m), y1: Math.max(ex0.y1, r.y1 - m), y2: Math.min(ex0.y2, r.y2 + m) };
+    const [kx, ky] = AP._k, [la0, lo0] = AP.osm.origin, m0 = 156543.03 * Math.cos(la0 * Math.PI / 180);
+    const mpp = Math.max(m0 / 2 ** 16, Math.max(ex.x2 - ex.x1, ex.y2 - ex.y1) / 4096);   // large airports: coarser, fewer tiles
+    const z = Math.min(TILE_PROV[state.base].max, 16, Math.round(Math.log2(m0 / mpp)));
+    const W = Math.round((ex.x2 - ex.x1) / mpp), H = Math.round((ex.y2 - ex.y1) / mpp); hiCv.width = W; hiCv.height = H;
+    const tc = hiCv.getContext('2d'); tc.fillStyle = '#2a2d33'; tc.fillRect(0, 0, W, H); let missing = 0;
+    const tx0 = Math.floor(lon2tx(lo0 + ex.x1 / kx, z)), tx1 = Math.floor(lon2tx(lo0 + ex.x2 / kx, z)), ty0 = Math.floor(lat2ty(la0 + ex.y2 / ky, z)), ty1 = Math.floor(lat2ty(la0 + ex.y1 / ky, z));
+    for (let tx = tx0; tx <= tx1; tx++) for (let ty = ty0; ty <= ty1; ty++) { const img = tileGet(state.base, z, tx, ty); if (!img) { missing++; continue; }
+      const xa = (tx2lon(tx, z) - lo0) * kx, xb = (tx2lon(tx + 1, z) - lo0) * kx, yt = (ty2lat(ty, z) - la0) * ky, yb = (ty2lat(ty + 1, z) - la0) * ky;
+      tc.drawImage(img, (xa - ex.x1) / mpp, (ex.y2 - yt) / mpp, (xb - xa) / mpp, (yt - yb) / mpp); }
+    tc.fillStyle = `rgba(8,10,14,${FILM})`; tc.fillRect(0, 0, W, H);
+    // the same hillshade and penetration overlay as the airport-wide texture, cut to the patch
+    const crop = (cv, op) => { if (!cv.width) return; const sx = cv.width / (ex0.x2 - ex0.x1), sy = cv.height / (ex0.y2 - ex0.y1);
+      tc.globalCompositeOperation = op; tc.drawImage(cv, (ex.x1 - ex0.x1) * sx, (ex0.y2 - ex.y2) * sy, (ex.x2 - ex.x1) * sx, (ex.y2 - ex.y1) * sy, 0, 0, W, H); tc.globalCompositeOperation = 'source-over'; };
+    crop(hsCv, 'multiply'); crop(ovCv, 'source-over');
+    if (hiTex) hiTex.dispose(); hiTex = new THREE.CanvasTexture(hiCv); hiTex.colorSpace = THREE.SRGBColorSpace; hiTex.anisotropy = 8;
+    hiU.hiMap.value = hiTex; hiU.hiRect.value.set(ex.x1, ex.y1, ex.x2, ex.y2); hiU.hiOn.value = 1;
+    if (missing) { hiPending = true; clearTimeout(hiTimer); hiTimer = setTimeout(scheduleSync, 750); } }
   function buildObstacles(rws) {
     if (L.obs) { G.remove(L.obs); L.obs.geometry.dispose(); L.obs = null; } L.obsList = [];
     if (!state.obs) return;
@@ -501,7 +541,7 @@ export function createEngine(canvas, cb) {
     const kO = k0 + '|' + state.bldH + '|' + state.obs; if (K.o !== kO) { K.o = kO; buildObstacles(rws); }
     const kT = k0 + '|' + state.pen, kB = kT + '|' + state.base;
     if (K.t !== kT) { K.t = kT; buildOverlay(rwsEx, rwsExt); K.b = null; }
-    if (K.b !== kB || texPending) { K.b = kB; buildBase(); }
+    if (K.b !== kB || texPending) { K.b = kB; buildBase(); } else if (hiPending) buildHi();
     const kP = [k0, state.proc.join(','), G.scale.y, AP.dem ? 1 : 0].join('|'); if (K.p !== kP) { K.p = kP; buildProcs(); } }
   function scheduleSync() { if (syncQueued) return; syncQueued = true; requestAnimationFrame(() => { syncQueued = false; sync(); }); }
   function fit(kind) { if (!AP) return;
@@ -550,6 +590,6 @@ export function createEngine(canvas, cb) {
   function destroy() { alive = false; canvas.removeEventListener('pointermove', onMove); ctl.dispose(); renderer.dispose(); }
 
   resize(); loop();
-  const debug = () => ({ planes: planes.map(p => ({ T: p.seq.map(q => Math.round(q.tr.T)), gap: p.seq.map(q => +q.gap.toFixed(1)), pool: p.pool.length, live: p.live, pos: p.pool.filter(o => o.visible).map(o => o.position.toArray().map(Math.round)) })), pending: texPending, K: { ...K }, texW: texCv.width, texH: texCv.height, hsW: hsCv.width, tex: texCv.toDataURL('image/jpeg', .5), hs: hsCv.width ? hsCv.toDataURL('image/jpeg', .5) : null });
+  const debug = () => ({ hi: { on: hiU.hiOn.value, rect: hiU.hiRect.value.toArray().map(Math.round), w: hiCv.width, h: hiCv.height, img: hiCv.width ? hiCv.toDataURL('image/jpeg', .4) : null, mat: !!L.ground?.material.onBeforeCompile }, planes: planes.map(p => ({ T: p.seq.map(q => Math.round(q.tr.T)), gap: p.seq.map(q => +q.gap.toFixed(1)), pool: p.pool.length, live: p.live, pos: p.pool.filter(o => o.visible).map(o => o.position.toArray().map(Math.round)) })), pending: texPending, K: { ...K }, texW: texCv.width, texH: texCv.height, hsW: hsCv.width, tex: texCv.toDataURL('image/jpeg', .5), hs: hsCv.width ? hsCv.toDataURL('image/jpeg', .5) : null });
   return { switchAirport, set, setExt, setRunway, fit, resize, destroy, snapshot, stats, debug };
 }
