@@ -44,7 +44,7 @@ const TABS: [Tab, string, string, React.ReactNode][] = [
   ["plan", "Planning", "계획하기", ic("M3 14l9-9 3 3-9 9H3zM10.5 6.5l3 3M15 3v4M13 5h4")],
   ["proc", "Flight procedures", "비행절차", ic("M10 2.5c.8 0 1.2.9 1.2 2v3.7l5.3 3v1.6l-5.3-1.6v3.3l1.8 1.4v1.3L10 16.5l-3 .7v-1.3l1.8-1.4v-3.3L3.5 12.8v-1.6l5.3-3V4.5c0-1.1.4-2 1.2-2z")],
   ["check", "Review", "검토", ic("M10 2.5l6 2.5v4.5c0 3.6-2.5 6.4-6 8-3.5-1.6-6-4.4-6-8V5zM10 7v3.5M10 13v.01")],
-  ["noise", "Noise exposure", "소음영향", ic("M3 8v4h3l4 3.5v-11L6 8zM13 7.5a3.5 3.5 0 010 5M15.5 5a7 7 0 010 10")],
+  ["noise", "Noise exposure", "소음영향", ic("M2 10.5l1.8-1.6 1.6 2.2 1.8-3.8 1.7 5.5 1.6-8.3 1.8 9.8 1.7-6.4 1.6 3.4 1.6-2.3 2.2 1.6")],
   ["info", "Data and assumptions", "자료·가정", ic("M10 17.5a7.5 7.5 0 100-15 7.5 7.5 0 000 15zM10 9v5M10 6.5v.01")],
   ["report", "Report", "보고서", ic("M5.5 2.5h6l4 4v11h-10zM11.5 2.5v4h4M8 11l2 2 2-2M10 8.5V13")],
 ];
