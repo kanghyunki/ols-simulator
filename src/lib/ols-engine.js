@@ -6,6 +6,9 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { AIRPORTS } from '@/data/airports.js';
 import { PROCEDURES } from '@/data/procedures.js';
+import { NOISE_TRAFFIC, NOISE_BANDS } from '@/data/noise-traffic.js';
+import { ANP } from '@/data/noise-anp.js';
+import { table as noiseTable, lden, lnAt } from '@/lib/noise.js';
 
 export { AIRPORTS } from '@/data/airports.js';
 
@@ -54,7 +57,7 @@ export function createEngine(canvas, cb) {
   // par: added parallel runways [{ ri, off, len }] — a copy of runway `ri` shifted `off` m to its left (A→B; negative = right),
   // centred on the reference, `len` m long (default: the reference length), same threshold elevations
   const state = { showEx: false, extA: [], extB: [], par: [], E: 39, base: 'sat', pen: true, obs: true, ofz: false, proc: [], bldH: 6,
-    surf: new Set(ALL_KEYS), rot: true, zex: 5 };   // zex: vertical exaggeration, 5× by default so relief and the surfaces' slopes read at airport scale
+    surf: new Set(ALL_KEYS), rot: true, zex: 5, noise: false, noiseCfg: null };   // noiseCfg: overrides of NOISE_TRAFFIC (annual, north, evening, night)   // zex: vertical exaggeration, 5× by default so relief and the surfaces' slopes read at airport scale
 
   // ---------- coordinates / geometry core (per-runway frames) ----------
   function initAp(ap) { if (!ap._k) { const lat0 = ap.osm.origin[0]; ap._k = [111320 * Math.cos(lat0 * Math.PI / 180), 110574]; }
@@ -241,7 +244,8 @@ export function createEngine(canvas, cb) {
       ap: AP ? { procs: (PROCEDURES[APID] || []).map(p => ({ id: p.id, name: p.name, color: p.color, rwy: p.rwy, ops: p.ops || null })), name: AP.name, sub: AP.sub, E: AP.E, code: AP.code || 4, origin: AP.osm.origin, ext: AP.ext || null, assume: AP.assume,
         rwys: AP.rwys.map((r, i) => ({ id: r.id, len: r.len, on: AP._on[i], nameA: r.nameA, nameB: r.nameB })),
         dem: AP.dem ? 'ok' : AP._demLoading ? 'loading' : AP._demFailed ? 'failed' : 'none', demSrc: AP.dem && AP.dem.src } : null,
-      state: { ...state, surf: [...state.surf], extA: [...state.extA], extB: [...state.extB], par: state.par.map(p => ({ ...p })), scen: scen() } };
+      state: { ...state, surf: [...state.surf], extA: [...state.extA], extB: [...state.extB], par: state.par.map(p => ({ ...p })), scen: scen() },
+      noise: noiseInfo() };
   }
   const emit = () => cb.onStatus && cb.onStatus(snapshot());
 
@@ -261,6 +265,7 @@ export function createEngine(canvas, cb) {
   // Detail patch: imagery 2 km around the runways (airport hiImg overrides the margin, 0 turns it off) at up to tile zoom 16
   // (~2 m/px, in at most 4096 px) in a texture of its own, which the ground shader uses inside that rectangle instead of the
   // airport-wide texture (~15 m/px).
+  const nzCv = document.createElement('canvas');   // noise contour bands, airport-wide like ovCv
   const hiCv = document.createElement('canvas'), hiU = { hiMap: { value: null }, hiRect: { value: new THREE.Vector4() }, hiOn: { value: 0 } };
   let hiTex = null, hiAt = 0, hiTimer = 0, hiPending = false;
   const groundMat = () => { const m = new THREE.MeshLambertMaterial({ map: tex });
@@ -386,7 +391,7 @@ export function createEngine(canvas, cb) {
         tc.drawImage(img, (xa - ex.x1) / mpp, (ex.y2 - yt) / mpp, (xb - xa) / mpp, (yt - yb) / mpp); }
       tc.fillStyle = `rgba(8,10,14,${FILM})`; tc.fillRect(0, 0, W, H); }
     if (hsCv.width) { tc.globalCompositeOperation = 'multiply'; tc.drawImage(hsCv, 0, 0, W, H); tc.globalCompositeOperation = 'source-over'; }
-    tc.drawImage(ovCv, 0, 0, W, H);
+    tc.drawImage(ovCv, 0, 0, W, H); if (state.noise && nzCv.width) tc.drawImage(nzCv, 0, 0, W, H);
     if (tex) tex.dispose(); tex = new THREE.CanvasTexture(texCv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
     if (L.ground) { L.ground.material.map = tex; L.ground.material.needsUpdate = true; }
     buildHi(); }
@@ -408,7 +413,7 @@ export function createEngine(canvas, cb) {
     // the same hillshade and penetration overlay as the airport-wide texture, cut to the patch
     const crop = (cv, op) => { if (!cv.width) return; const sx = cv.width / (ex0.x2 - ex0.x1), sy = cv.height / (ex0.y2 - ex0.y1);
       tc.globalCompositeOperation = op; tc.drawImage(cv, (ex.x1 - ex0.x1) * sx, (ex0.y2 - ex.y2) * sy, (ex.x2 - ex.x1) * sx, (ex.y2 - ex.y1) * sy, 0, 0, W, H); tc.globalCompositeOperation = 'source-over'; };
-    crop(hsCv, 'multiply'); crop(ovCv, 'source-over');
+    crop(hsCv, 'multiply'); crop(ovCv, 'source-over'); if (state.noise && nzCv.width) crop(nzCv, 'source-over');
     if (hiTex) hiTex.dispose(); hiTex = new THREE.CanvasTexture(hiCv); hiTex.colorSpace = THREE.SRGBColorSpace; hiTex.anisotropy = 8;
     hiU.hiMap.value = hiTex; hiU.hiRect.value.set(ex.x1, ex.y1, ex.x2, ex.y2); hiU.hiOn.value = 1;
     if (missing) { hiPending = true; clearTimeout(hiTimer); hiTimer = setTimeout(scheduleSync, 750); } }
@@ -543,6 +548,54 @@ export function createEngine(canvas, cb) {
       o.scale.setScalar(k); o.position.y += lift(a) + (lift(b) - lift(a)) * f; _b.y += lift(b);
       if (o.position.distanceToSquared(_b) > 1) o.lookAt(_b); }
 
+  // ---------- noise (Lden) ----------
+  // Tracks: straight along each runway end's extended centreline; arrivals from the touchdown point (THR + 291 m),
+  // departures from the start of roll at the threshold. Runway roles from the procedures' ops (Incheon: RWY 1/3
+  // departures, 2/4 arrivals); other runways carry both. Computed in small steps so the page stays responsive.
+  const NZ = { key: null, grid: null, busy: false, progress: 0, bands: null, run: 0 };
+  const noiseCfg = () => { const t = NOISE_TRAFFIC[APID]; return t ? { ...t, ...(state.noiseCfg || {}) } : null; };
+  const noiseBands = () => NOISE_BANDS[countryOf() === 'Korea' ? 'kr' : 'intl'];
+  const countryOf = () => (AP.sub || '').split(' · ').pop();
+  function noiseInfo() { if (!AP) return null; const c = noiseCfg();
+    return { available: !!c, cfg: c, busy: NZ.busy, progress: NZ.progress, bands: NZ.bands, scheme: countryOf() === 'Korea' ? 'kr' : 'intl',
+      fleet: c ? c.fleet.map(([id, sh]) => [ANP[id].label, sh]) : null }; }
+  function noiseTracks(c) {
+    const rws = frames(scen() !== 'ex'), procs = PROCEDURES[APID] || [], perDay = c.annual / 365, wN = (1 - c.evening - c.night) + c.evening * 3.1623 + c.night * 10;
+    const roleOf = (rw) => { const o = new Set(procs.filter(p => p.rwy === rw.nameA.replace('′', '') || p.rwy === rw.nameB.replace('′', '')).map(p => p.ops).filter(Boolean)); return o.size === 1 ? [...o][0] : 'both'; };
+    const on = rws.filter(r => r.on), arrR = on.filter(r => roleOf(r) !== 'dep'), depR = on.filter(r => roleOf(r) !== 'arr'), T = [];
+    const north = (rw, atA) => { const u = atA ? rw.U : [-rw.U[0], -rw.U[1]]; return u[1] > 0; };   // heading roughly north (33/34)
+    for (const [list, mode] of [[arrR, 'A'], [depR, 'D']]) for (const rw of list) for (const atA of [true, false]) {
+      const u = atA ? rw.U : [-rw.U[0], -rw.U[1]], P0 = atA ? rw.A : rw.B, share = north(rw, atA) ? c.north : 1 - c.north;
+      const wt = (r) => (c.rwyShare && AP.rwys[r.i] ? c.rwyShare[AP.rwys[r.i].id] ?? 0 : 1), tot = list.reduce((a, r) => a + wt(r), 0) || 1;
+      const n = perDay / 2 * wt(rw) / tot * share * wN; if (!n) continue;
+      const o = mode === 'A' ? [P0[0] + u[0] * 291, P0[1] + u[1] * 291] : P0;
+      T.push({ x: o[0], y: o[1], ux: u[0], uy: u[1], mode, n }); }
+    return T; }
+  async function buildNoise() {
+    const c = noiseCfg(); if (!c || !state.noise) { if (nzCv.width) { nzCv.width = 0; K.b = null; scheduleSync(); } return; }
+    const key = [APID, scen(), state.extA.join(), state.extB.join(), parKey(), AP._on.join(''), JSON.stringify(c)].join('|');
+    if (key === NZ.key) { if (!nzCv.width && NZ.grid) drawNoise(); return; }
+    NZ.key = key; const run = ++NZ.run; NZ.busy = true; NZ.progress = 0; emit();
+    const jobs = []; for (const [ac] of c.fleet) for (const m of ['A', 'D']) jobs.push([ac, m]);
+    for (let i = 0; i < jobs.length; i++) { noiseTable(...jobs[i]); NZ.progress = (i + 1) / (jobs.length + 1); emit(); await new Promise(r => setTimeout(r, 0)); if (run !== NZ.run) return; }
+    const rws = frames(scen() !== 'ex'), ends = rws.flatMap(f => [f.A, f.B]), m = 20000;   // the 55 dB contour stays inside
+    const ex = { x1: Math.min(...ends.map(q => q[0])) - m, x2: Math.max(...ends.map(q => q[0])) + m, y1: Math.min(...ends.map(q => q[1])) - m, y2: Math.max(...ends.map(q => q[1])) + m };
+    NZ.grid = lden(noiseTracks(c), c.fleet, ex, 100);
+    // band areas (km²)
+    const B = noiseBands(), area = B.map(() => 0); for (const v of NZ.grid.L) { for (let b = B.length - 1; b >= 0; b--) if (v >= B[b][0]) { area[b] += 0.01; break; } }
+    NZ.bands = B.map((b, i) => ({ lo: b[0], ko: b[1], en: b[2], color: b[3], km2: +area[i].toFixed(1) }));
+    NZ.busy = false; NZ.progress = 1; drawNoise(); emit(); }
+  function drawNoise() { const ex = L.groundEx, g = NZ.grid; if (!ex || !g) return; const B = noiseBands();
+    const W = 2048, H = Math.max(64, Math.round(W * (ex.y2 - ex.y1) / (ex.x2 - ex.x1))); nzCv.width = W; nzCv.height = H;
+    const c = nzCv.getContext('2d'), img = c.createImageData(W, H), d = img.data, rgb = B.map(b => [1, 3, 5].map(k => parseInt(b[3].slice(k, k + 2), 16)));
+    const band = new Int8Array(W * H).fill(-1);
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const v = lnAt(g, ex.x1 + (ex.x2 - ex.x1) * (i + .5) / W, ex.y2 - (ex.y2 - ex.y1) * (j + .5) / H);
+      let b = -1; for (let k = B.length - 1; k >= 0; k--) if (v >= B[k][0]) { b = k; break; } band[j * W + i] = b; }
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const k = j * W + i, b = band[k]; if (b < 0) continue;
+      const edge = (i && band[k - 1] !== b) || (j && band[k - W] !== b) || (i < W - 1 && band[k + 1] !== b) || (j < H - 1 && band[k + W] !== b);
+      const [r, gg, bb] = rgb[b], q = k * 4; d[q] = r; d[q + 1] = gg; d[q + 2] = bb; d[q + 3] = edge ? 235 : 110; }
+    c.putImageData(img, 0, 0); K.b = null; scheduleSync(); }
+
   function sync() { if (!alive || !AP) return;
     const rwsEx = frames(false), rwsExt = frames(true), rws = scen() === 'ext' ? rwsExt : rwsEx;
     const kG = APID + '|' + (AP.dem ? 1 : 0); if (K.g !== kG) { K.g = kG; buildGround(); K.t = null; K.o = null; }   // terrain arrived after the first draw: obstacles' ground heights must be rebuilt too
@@ -554,6 +607,7 @@ export function createEngine(canvas, cb) {
     const kT = k0 + '|' + state.pen, kB = kT + '|' + state.base;
     if (K.t !== kT) { K.t = kT; buildOverlay(rwsEx, rwsExt); K.b = null; }
     if (K.b !== kB || texPending) { K.b = kB; buildBase(); } else if (hiPending) buildHi();
+    const kN = [k0, state.noise, JSON.stringify(state.noiseCfg)].join('|'); if (K.n !== kN) { K.n = kN; buildNoise(); }
     const kP = [k0, state.proc.join(','), G.scale.y, AP.dem ? 1 : 0].join('|'); if (K.p !== kP) { K.p = kP; buildProcs(); } }
   function scheduleSync() { if (syncQueued) return; syncQueued = true; requestAnimationFrame(() => { syncQueued = false; sync(); }); }
   function fit(kind) { if (!AP) return;
@@ -576,7 +630,7 @@ export function createEngine(canvas, cb) {
       return { kind: 'obstacle', name: o.b.n || null, tag: bTag(o.b), h: o.h, g: o.g, top: o.top, limit: o.r ? { h: o.r.h, name: o.r.name } : null, pen: o.pen }; }
     const P = [h.point.x, -h.point.z], rwsEx = frames(false), rwsExt = frames(true), ax = rwsEx[0];
     const a = ols(P, rwsEx), b = ols(P, rwsExt), [s, d] = sd(P, ax), g = demAt(P[0], P[1]);
-    return { kind: 'point', s, d, ground: g, ex: a, ext: b, refA: ax.nameA }; }
+    return { kind: 'point', s, d, ground: g, ex: a, ext: b, refA: ax.nameA, lden: state.noise && NZ.grid ? lnAt(NZ.grid, P[0], P[1]) : null }; }
   const onMove = e => { if (!AP || !cb.onHover) return; const h = pick(e); cb.onHover(h ? hoverInfo(h) : null); };
   canvas.addEventListener('pointermove', onMove);
 
@@ -603,7 +657,8 @@ export function createEngine(canvas, cb) {
 
   resize(); loop();
   // console probes for terrain checks: __ols.probe.dem(x, y), __ols.probe.ols(x, y), __ols.probe.xy(lat, lon)
-  const probe = { dem: (x, y) => demAt(x, y), ols: (x, y) => ols([x, y], frames(true)), xy: (lat, lon) => LL(AP, [lat, lon]), rws: () => frames(false).map(f => ({ A: f.A, B: f.B, eA: f.eA, eB: f.eB })), demInfo: () => AP.dem && { src: AP.dem.src, dx: AP.dem.dx, dy: AP.dem.dy, nx: AP.dem.nx, ny: AP.dem.ny } };
+  const probe = { noiseEdge: () => noiseEdge(), dem: (x, y) => demAt(x, y), ols: (x, y) => ols([x, y], frames(true)), xy: (lat, lon) => LL(AP, [lat, lon]), rws: () => frames(false).map(f => ({ A: f.A, B: f.B, eA: f.eA, eB: f.eB })), demInfo: () => AP.dem && { src: AP.dem.src, dx: AP.dem.dx, dy: AP.dem.dy, nx: AP.dem.nx, ny: AP.dem.ny } };
+  const noiseEdge = () => { const g = NZ.grid; if (!g) return null; let m = -1e9; for (let i = 0; i < g.nx; i++) m = Math.max(m, g.L[i], g.L[(g.ny - 1) * g.nx + i]); for (let j = 0; j < g.ny; j++) m = Math.max(m, g.L[j * g.nx], g.L[j * g.nx + g.nx - 1]); return +m.toFixed(1); };
   const debug = () => ({ hi: { on: hiU.hiOn.value, rect: hiU.hiRect.value.toArray().map(Math.round), w: hiCv.width, h: hiCv.height, img: hiCv.width ? hiCv.toDataURL('image/jpeg', .4) : null, mat: !!L.ground?.material.onBeforeCompile }, planes: planes.map(p => ({ T: p.seq.map(q => Math.round(q.tr.T)), gap: p.seq.map(q => +q.gap.toFixed(1)), pool: p.pool.length, live: p.live, pos: p.pool.filter(o => o.visible).map(o => o.position.toArray().map(Math.round)) })), pending: texPending, K: { ...K }, texW: texCv.width, texH: texCv.height, hsW: hsCv.width, tex: texCv.toDataURL('image/jpeg', .5), hs: hsCv.width ? hsCv.toDataURL('image/jpeg', .5) : null });
   return { switchAirport, set, setExt, setRunway, fit, resize, destroy, snapshot, stats, debug, probe };
 }

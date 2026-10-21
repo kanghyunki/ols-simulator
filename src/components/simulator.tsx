@@ -37,13 +37,14 @@ const tagKo = (n: string) => n.replace(/^(.*?)( \(assumed height\))?$/, (_, a, b
 const regionCountries = (region: string) => [...new Set(Object.values(AIRPORTS as Record<string, any>).filter((a) => a.region === region).map(countryOf))].sort();
 
 // Left icon rail: each icon opens its panel beside the rail (the same icon again closes it); a bottom tab bar on phones
-type Tab = "ols" | "plan" | "proc" | "check" | "info" | "report";
+type Tab = "ols" | "plan" | "proc" | "check" | "noise" | "info" | "report";
 const ic = (d: string) => <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d={d} /></svg>;
 const TABS: [Tab, string, string, React.ReactNode][] = [
   ["ols", "Obstacle surfaces", "장애물제한표면", ic("M10 3l7 3.5-7 3.5-7-3.5zM3 10l7 3.5 7-3.5M3 13.5L10 17l7-3.5")],
   ["plan", "Planning", "계획하기", ic("M3 14l9-9 3 3-9 9H3zM10.5 6.5l3 3M15 3v4M13 5h4")],
   ["proc", "Flight procedures", "비행절차", ic("M10 2.5c.8 0 1.2.9 1.2 2v3.7l5.3 3v1.6l-5.3-1.6v3.3l1.8 1.4v1.3L10 16.5l-3 .7v-1.3l1.8-1.4v-3.3L3.5 12.8v-1.6l5.3-3V4.5c0-1.1.4-2 1.2-2z")],
   ["check", "Review", "검토", ic("M10 2.5l6 2.5v4.5c0 3.6-2.5 6.4-6 8-3.5-1.6-6-4.4-6-8V5zM10 7v3.5M10 13v.01")],
+  ["noise", "Noise exposure", "소음영향", ic("M3 8v4h3l4 3.5v-11L6 8zM13 7.5a3.5 3.5 0 010 5M15.5 5a7 7 0 010 10")],
   ["info", "Data and assumptions", "자료·가정", ic("M10 17.5a7.5 7.5 0 100-15 7.5 7.5 0 000 15zM10 9v5M10 6.5v.01")],
   ["report", "Report", "보고서", ic("M5.5 2.5h6l4 4v11h-10zM11.5 2.5v4h4M8 11l2 2 2-2M10 8.5V13")],
 ];
@@ -86,7 +87,14 @@ export function Simulator({ onHome }: { onHome: () => void }) {
   const [tab, setTab] = useState<Tab | null>(null);   // open panel; none on phones at first, so the 3D view shows
   useEffect(() => { if (matchMedia("(min-width: 768px)").matches) setTab("ols"); }, []);
   const [stats, setStats] = useState<any>(null);       // Review / Report: penetrations of the current scenario
-  const [layerOpen, setLayerOpen] = useState(false);   // bottom-left layer switcher: unfolds on hover (tap on phones)
+  const [layerOpen, setLayerOpen] = useState(false);
+  // Noise and OLS take turns: opening Noise exposure hides the surfaces and the terrain penetration (remembered), opening
+  // Obstacle surfaces turns the noise contours off and brings them back
+  const olsPrev = useRef<{ surf: string[]; pen: boolean } | null>(null);
+  useEffect(() => { const e = eng.current, s = e?.snapshot().state; if (!e || !s) return;
+    if (tab === "noise") { if (s.surf.length) olsPrev.current = { surf: s.surf as string[], pen: !!s.pen }; e.set({ noise: true, surf: [], pen: false }); }
+    else if (tab === "ols" && s.noise) { const p = olsPrev.current; e.set({ noise: false, surf: p?.surf.length ? p.surf : ALL_KEYS, pen: p?.pen ?? true }); }
+  }, [tab]);
   // Top picker: folded to one line; unfolds on hover / focus / click, folds again once an airport is picked
   // (hold keeps it folded under the pointer until the pointer leaves)
   const [pickOpen, setPickOpen] = useState(false), [pickHold, setPickHold] = useState(false);
@@ -147,6 +155,14 @@ export function Simulator({ onHome }: { onHome: () => void }) {
   const swatch = (k: string, cls: string) => { const u = thumb(k);
     // eslint-disable-next-line @next/next/no-img-element
     return u ? <img src={u} alt="" className={`${cls} object-cover`} /> : <span className={`${cls} bg-[linear-gradient(135deg,#1b1e24,#2a2d33)]`} />; };
+  // Runway on/off, shared by the Obstacle surfaces and Noise exposure panels
+  const runwayButtons = ap && <>
+            <H>{t("Runways", "활주로")}</H>
+            <Toggle size="sm" className={pill} pressed={ap.rwys.every((r: any) => r.on)} onPressedChange={() => ap.rwys.forEach((_: any, i: number) => eng.current?.setRunway(i, true))}>{t("All runways", "전체 활주로")}</Toggle>
+            <div className={grid2}>
+              {ap.rwys.map((r: any, i: number) => <Toggle key={r.id} size="sm" className={cell} pressed={r.on} onPressedChange={(v) => eng.current?.setRunway(i, v)}><span className="truncate">{r.id}</span> <span className="ml-auto font-mono text-[10px] text-white/45">{r.len.toLocaleString("en")}m</span></Toggle>)}
+            </div>
+  </>;
   const cur = snap?.apId ? (AIRPORTS as any)[snap.apId] : null;
   const fold = () => { setPickOpen(false); setPickHold(false); if (cur) { setRegion(cur.region); setCountry(countryOf(cur)); } };   // back to the airport on show
   const unfolded = pickOpen && !pickHold;
@@ -216,11 +232,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
         {snap?.failed && <Note>{t("Could not load the airport data (network).", "공항 데이터를 불러오지 못했습니다 (네트워크).")}</Note>}
         {ap && (
           <>
-            <H>{t("Runways", "활주로")}</H>
-            <Toggle size="sm" className={pill} pressed={ap.rwys.every((r: any) => r.on)} onPressedChange={() => ap.rwys.forEach((_: any, i: number) => eng.current?.setRunway(i, true))}>{t("All runways", "전체 활주로")}</Toggle>
-            <div className={grid2}>
-              {ap.rwys.map((r: any, i: number) => <Toggle key={r.id} size="sm" className={cell} pressed={r.on} onPressedChange={(v) => eng.current?.setRunway(i, v)}><span className="truncate">{r.id}</span> <span className="ml-auto font-mono text-[10px] text-white/45">{r.len.toLocaleString("en")}m</span></Toggle>)}
-            </div>
+            {runwayButtons}
           </>
         )}
 
@@ -332,6 +344,36 @@ export function Simulator({ onHome }: { onHome: () => void }) {
             </div>}
           </>}
 
+          {tab === "noise" && (() => { const nz = snap?.noise, c = nz?.cfg, kr = nz?.scheme === "kr";
+            if (!nz?.available) return <Note>{t("No traffic data for this airport yet.", "이 공항은 아직 운항 자료가 없습니다.")}</Note>;
+            const upd = (q: Record<string, number>) => set({ noiseCfg: { ...(st?.noiseCfg ?? {}), ...q } });
+            const pct = (v: number) => `${Math.round(v * 100)}%`;
+            return <>
+              <Toggle size="sm" className={pill} pressed={!!st?.noise} onPressedChange={(v) => set({ noise: v })}>{t("Show Lden contours", "Lden 등고선 표시")}</Toggle>
+              {runwayButtons}
+              <div className="mt-3 text-[11px] text-white/45">{kr ? t("Korean airport noise zones (Lden, from 2023)", "국내 소음대책지역 기준 (Lden, 2023~)") : t("International comparison (EU, Lden 5 dB bands)", "국제 비교 기준 (EU, Lden 5 dB 단위)")}</div>
+              {nz.busy ? <Note>{t("Computing", "계산 중")} {Math.round((nz.progress ?? 0) * 100)}%…</Note> : nz.bands && st?.noise && (
+                <div className="mt-2 space-y-1 rounded-lg border border-white/10 bg-white/[.03] p-2.5 text-[11.5px]">
+                  {[...nz.bands].reverse().map((b: any) => (
+                    <div key={b.lo} className="flex items-center gap-2"><span className="size-3 shrink-0 rounded-sm" style={{ background: b.color }} />
+                      <span className="text-white/80">{t(b.en, b.ko)}</span><span className="text-white/40">≥ {b.lo} dB</span>
+                      <span className="ml-auto font-mono text-white/70">{b.km2} km²</span></div>))}
+                </div>)}
+              <H>{t("Traffic", "운항")}</H>
+              <label className="flex items-center gap-2 text-[11px] text-white/60"><span className="w-24">{t("Annual movements", "연간 운항")}</span>
+                <input type="number" step={1000} min={0} value={c.annual} onChange={(e) => upd({ annual: Math.max(0, +e.target.value) })} className="w-24 rounded border border-white/10 bg-white/10 px-1.5 py-0.5 font-mono text-white/85" />
+                <span className="text-white/40">{t("per year", "회/년")}</span></label>
+              {([["north", t("Northbound share", "북쪽 방향 비율")], ["evening", t("Evening 19–22 h", "저녁 19–22시")], ["night", t("Night 22–07 h", "야간 22–07시")]] as [string, string][]).map(([k, label]) => (
+                <label key={k} className="mt-1.5 flex items-center gap-2 text-[11px] text-white/60"><span className="w-24">{label}</span>
+                  <input type="range" min={0} max={k === "north" ? 1 : 0.4} step={0.01} value={c[k]} onChange={(e) => upd({ [k]: +e.target.value })} className="w-28 accent-white" />
+                  <span className="font-mono text-white/80">{pct(c[k])}</span></label>))}
+              {c.estimate && <p className="mt-2 rounded border border-amber-400/30 bg-amber-400/10 px-2 py-1.5 text-[10.5px] leading-snug text-amber-200/90">{t("Movements are an estimate — replace them with the airport's statistics.", "운항 횟수가 추정값입니다. 공항 통계로 바꿔 넣어 주세요.")}</p>}
+              <div className="mt-3 text-[11px] text-white/45">{t("Representative fleet (assumed)", "대표 기종 구성 (가정)")}</div>
+              <div className="mt-1 grid grid-cols-2 gap-x-3 font-mono text-[10.5px] text-white/60">{nz.fleet.map(([n, sh]: [string, number]) => <span key={n} className="flex justify-between"><span className="font-sans">{n}</span>{pct(sh)}</span>)}</div>
+              <Note>{t(`Movements: ${c.source}. Runway roles as operated where known (Incheon RWY 1/3 departures, 2/4 arrivals), otherwise every runway carries both; fleet mix, time of day and direction are assumptions. Method: ICAO Doc 9911 / ECAC Doc 29 segment method with ANP v2.3 NPD data and procedural profiles (EUROCONTROL / EASA); straight tracks, flat ground, ISA. For planning screening only — not the official noise zone map.`,
+                `운항 횟수: ${c.source}. 활주로 운영은 알려진 경우 실제대로(인천 RWY 1·3 이륙, 2·4 착륙), 그 밖에는 모든 활주로가 이착륙을 함께 합니다. 기종 구성·시간대·방향 비율은 가정값입니다. 계산: ICAO Doc 9911 / ECAC Doc 29 구간법, ANP v2.3 NPD·비행 프로파일(EUROCONTROL / EASA). 직선 항적, 평탄 지형, 표준대기 가정. 계획 검토용이며 공식 소음대책지역 고시를 대신하지 않습니다.`)}</Note>
+            </>; })()}
+
           {tab === "info" && <>
         {ap && <Note>{ap.sub} · {t(`AD ${ap.E} m AMSL`, `공항표고 ${ap.E} m`)} · Annex 14 {t("code", "코드")} {ap.code} · {ap.dem === "ok" ? t("terrain loaded", "지형 불러옴") : ap.dem === "loading" ? t("terrain loading…", "지형 불러오는 중…") : ap.dem === "failed" ? t("terrain unavailable", "지형 사용 불가") : t("terrain none", "지형 없음")}</Note>}
 
@@ -370,6 +412,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
               : <div className="text-white/50">{t("Outside the OLS", "OLS 범위 밖")}</div>; })()}
             {hover.ground !== null && <div>{t("Ground", "지면")} {fmt(hover.ground)} m{(() => { const r = st?.scen === "ext" ? hover.ext : hover.ex; if (!r) return null; const m = r.h - hover.ground; return <span style={{ color: m < 0 ? "#f0625c" : "#6fcf8a" }}> · {m >= 0 ? t("clear", "여유") : t("through", "침투")} {fmt(Math.abs(m))} m</span>; })()}</div>}
             {st?.scen === "cmp" && hover.ex && hover.ext && <div>{t("Extended:", "연장 후:")} {fmt(hover.ext.h)} m ({hover.ext.h - hover.ex.h >= 0 ? "+" : ""}{fmt(hover.ext.h - hover.ex.h)} m)</div>}
+            {hover.lden != null && isFinite(hover.lden) && <div>Lden <b className="font-mono text-white">{fmt(hover.lden)} dB</b>{(() => { const b = [...(snap?.noise?.bands ?? [])].reverse().find((x: any) => hover.lden >= x.lo); return b ? <span style={{ color: b.color }}> · {t(b.en, b.ko)}</span> : null; })()}</div>}
             <div className="font-mono text-[10.5px] text-white/40">{t(<>s {fmt(hover.s, 0)} m · d {fmt(hover.d, 0)} m from THR {hover.refA}</>, <>THR {hover.refA} 기준 s {fmt(hover.s, 0)} m · d {fmt(hover.d, 0)} m</>)}</div>
           </div>
         ) : <div className="mt-2 text-white/45">{t("Move over a surface or a building.", "표면이나 건물 위에 마우스를 올려 보세요.")}</div>}

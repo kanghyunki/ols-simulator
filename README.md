@@ -44,6 +44,7 @@ npm run dev
 | 활주로 연장·평행활주로 시나리오, 기존 OLS 비교 | `src/lib/ols-engine.js` (`frames`, `setExt`), `src/components/simulator.tsx` |
 | 계기접근절차(ILS, 실패접근) 3D 표시 — 인천 8개(활주로 양방향)·김포 5개·제주 4개·김해 1개, 연장 시 경로 이동, 항공기 이착륙 애니메이션(인천은 활주로별 이륙·착륙 전용 운영) | `src/data/procedures.js`, `src/lib/ols-engine.js` (`buildProcs`, `procShift`) |
 | 화면(아이콘 레일과 패널 7개: 표면·계획·비행절차·검토·지도·자료·보고서, 공항 선택, 고도 판독, 침투 요약과 CSV 보고서) | `src/components/simulator.tsx`, `src/lib/ols-engine.js` (`stats`) |
+| 소음영향(Lden) 등고선 — ICAO Doc 9911 / ECAC Doc 29 구간법, ANP v2.3 NPD·비행 프로파일, 국내는 소음대책지역(57/61/66/70/75/79 dB)·해외는 EU식 55~75 dB | `src/lib/noise.js`, `src/data/noise-anp.js`, `src/data/noise-traffic.js`, `tools/noise/anp_profiles.py` |
 | 공항 레지스트리(37개 공항: 활주로 시단 좌표·표고, 가정값 안내) | `src/data/airports.js` |
 | 공항별 OSM 활주로·건물·도로 데이터 / 지형 격자 | `public/data/osm_*.js`, `public/dem/*.bin` |
 | 랜딩·Product·Project·About·Contact·Log in·Sign up 페이지 | `src/app/` |
@@ -58,4 +59,5 @@ OpenStreetMap(Overpass)·GEDTM30에서 생성했습니다. PNG 외 공항의 지
 - 지형: GEDTM30 (OpenGeoHub / OpenLandMap, CC BY 4.0) — 수목·건물을 제거한 지면고 DTM, 30 m. 공항별 격자는 `tools/dem/gedtm.py`로 생성
 - 건물·도로: © OpenStreetMap contributors (ODbL). `public/data`의 공항별 데이터는 OpenStreetMap에서 추출한 것으로 ODbL을 따릅니다.
 - 배경 영상: Esri World Imagery (화면 표시용)
+- 항공기 소음: ANP v2.3 (EUROCONTROL 작성, EASA 공개 레거시 데이터) NPD 곡선·절차 단계. 운항 횟수: 인천국제공항공사, 항공정보포털(한국공항공사), GASTAT, Changi Airport Group 2025. 기종 구성·시간대 비율·PNG/모잠비크 운항 횟수는 가정·추정값
 - 계기접근절차: AIP 대한민국 RKSI AD 2-51/55/58/60, 2-62~69 (AIRAC AIP AMDT 13/25, 2/26, 3/26), RKSS AD 2-29/30/32/34/37, RKPC AD 2-21/22/26/27, RKPK AD 2-21 (AIP AMDT 11/26). DME 호와 실패접근 중간 고도(최소 상승률 2.5 %)는 근사값(≈)
