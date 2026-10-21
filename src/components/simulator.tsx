@@ -36,6 +36,19 @@ const surfKo = (n: string) => n.replace(new RegExp(`^(${Object.keys(SURF_KO).joi
 const tagKo = (n: string) => n.replace(/^(.*?)( \(assumed height\))?$/, (_, a, b) => (TAG_KO[a] ?? a) + (b ? " (높이 가정)" : ""));
 const regionCountries = (region: string) => [...new Set(Object.values(AIRPORTS as Record<string, any>).filter((a) => a.region === region).map(countryOf))].sort();
 
+// Left icon rail: each icon opens its panel beside the rail (the same icon again closes it); a bottom tab bar on phones
+type Tab = "ols" | "plan" | "proc" | "check" | "map" | "info" | "report";
+const ic = (d: string) => <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d={d} /></svg>;
+const TABS: [Tab, string, string, React.ReactNode][] = [
+  ["ols", "Obstacle surfaces", "장애물제한표면", ic("M10 3l7 3.5-7 3.5-7-3.5zM3 10l7 3.5 7-3.5M3 13.5L10 17l7-3.5")],
+  ["plan", "Planning", "계획하기", ic("M3 14l9-9 3 3-9 9H3zM10.5 6.5l3 3M15 3v4M13 5h4")],
+  ["proc", "Flight procedures", "비행절차", ic("M10 2.5c.8 0 1.2.9 1.2 2v3.7l5.3 3v1.6l-5.3-1.6v3.3l1.8 1.4v1.3L10 16.5l-3 .7v-1.3l1.8-1.4v-3.3L3.5 12.8v-1.6l5.3-3V4.5c0-1.1.4-2 1.2-2z")],
+  ["check", "Review", "검토", ic("M10 2.5l6 2.5v4.5c0 3.6-2.5 6.4-6 8-3.5-1.6-6-4.4-6-8V5zM10 7v3.5M10 13v.01")],
+  ["map", "Map and view", "지도·보기", ic("M2.5 5.5l5-2 5 2 5-2v11l-5 2-5-2-5 2zM7.5 3.5v11M12.5 5.5v11")],
+  ["info", "Data and assumptions", "자료·가정", ic("M10 17.5a7.5 7.5 0 100-15 7.5 7.5 0 000 15zM10 9v5M10 6.5v.01")],
+  ["report", "Report", "보고서", ic("M5.5 2.5h6l4 4v11h-10zM11.5 2.5v4h4M8 11l2 2 2-2M10 8.5V13")],
+];
+
 function H({ children }: { children: React.ReactNode }) { return <div className="mt-5 mb-2 text-[13px] font-semibold text-white first:mt-0">{children}</div>; }
 function Note({ children }: { children: React.ReactNode }) { return <p className="mt-1.5 max-w-[250px] text-[10.5px] leading-snug text-white/40">{children}</p>; }
 const fmt = (v: number, d = 1) => v.toFixed(d);
@@ -71,7 +84,9 @@ export function Simulator({ onHome }: { onHome: () => void }) {
   const [country, setCountry] = useState("Korea");
   const [sel, setSel] = useState<Set<string>>(new Set());   // runway ends picked for extension (while still at 0 m)
   const [fs, setFs] = useState(false);
-  const [menu, setMenu] = useState(false);   // mobile only: controls shown as a bottom sheet
+  const [tab, setTab] = useState<Tab | null>(null);   // open panel; none on phones at first, so the 3D view shows
+  useEffect(() => { if (matchMedia("(min-width: 768px)").matches) setTab("ols"); }, []);
+  const [stats, setStats] = useState<any>(null);       // Review / Report: penetrations of the current scenario
   // Top picker: folded to one line; unfolds on hover / focus / click, folds again once an airport is picked
   // (hold keeps it folded under the pointer until the pointer leaves)
   const [pickOpen, setPickOpen] = useState(false), [pickHold, setPickHold] = useState(false);
@@ -102,6 +117,19 @@ export function Simulator({ onHome }: { onHome: () => void }) {
 
   const st = snap?.state, ap = snap?.ap;
   useEffect(() => { setSel(new Set()); }, [snap?.apId]);
+  // recomputed (debounced) only while Review or Report is open, whenever the scenario or the obstacle data change
+  const statKey = st && ap ? [snap.apId, st.extA.join(), st.extB.join(), JSON.stringify(st.par), st.ofz, st.obs, ap.dem, st.bldH].join("|") : "";
+  useEffect(() => { if ((tab !== "check" && tab !== "report") || !statKey) return;
+    const id = setTimeout(() => setStats(eng.current?.stats() ?? null), 250); return () => clearTimeout(id); }, [tab, statKey]);
+  const scenName = st?.scen === "ex" ? t("existing airport", "현재 공항") : t("planned (extensions / parallel runways)", "계획안 (연장·평행활주로 반영)");
+  const downloadCsv = () => { const r = eng.current?.stats(); if (!r) return;
+    const q = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows: unknown[][] = [["OLS Simulator", r.apId, scenName], [], ["building", "type", "height m", "top m AMSL", "limit m AMSL", "surface", "penetration m"],
+      ...r.obsBad.map((o: any) => [o.name, o.tag, o.h, o.top, o.limit, o.surface, o.pen]), [],
+      ["terrain: surface", "area km2", "max penetration m"], ...Object.values(r.bySurface).map((b: any) => [b.name, b.area, b.max])];
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob(["\ufeff" + rows.map((x) => x.map(q).join(",")).join("\r\n")], { type: "text/csv" }));
+    a.download = `OLS_${r.apId}_${st?.scen === "ex" ? "existing" : "planned"}.csv`; a.click(); URL.revokeObjectURL(a.href); };
   const set = (p: Record<string, unknown>) => eng.current?.set(p);
   const surf = new Set<string>(st?.surf ?? ALL_KEYS);
   const surfaces = st?.ofz ? [...SURFACES, ...OFZ_SURFACES] : SURFACES;
@@ -110,23 +138,6 @@ export function Simulator({ onHome }: { onHome: () => void }) {
     <Column label={t("Region", "지역")} rows={rows} items={REGIONS.map(([k]) => [k, regionName(k)])} value={region} onPick={(v) => { setRegion(v); setCountry(regionCountries(v)[0]); }} />
     <Column label={t("Country", "국가")} rows={rows} items={regionCountries(region).map((c) => [c, countryName(c)])} value={country} onPick={setCountry} empty={t("No airports yet", "아직 공항이 없습니다")} />
     <Column label={t("Airport", "공항")} rows={rows} items={airports.map(([k, a]) => [k, airportName(a) ?? k])} value={snap?.apId ?? ""} onPick={(k) => { eng.current?.switchAirport(k); picked?.(); }} />
-  </>;
-  // Ground imagery and vertical exaggeration: bottom right above the coordinates on wider screens, in the Controls sheet on phones
-  const groundVertical = <>
-    <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
-      <span className="mr-1 text-[11px] text-white/45">{t("Ground", "바닥")}</span>
-      <ToggleGroup type="single" value={st?.base ?? "sat"} onValueChange={(v) => v && set({ base: v })} className="gap-1.5">
-        <ToggleGroupItem value="sat" size="sm" className={pill}>{t("Satellite", "위성")}</ToggleGroupItem>
-        <ToggleGroupItem value="osm" size="sm" className={pill}>{t("OSM", "지도")}</ToggleGroupItem>
-        <ToggleGroupItem value="none" size="sm" className={pill}>{t("None", "없음")}</ToggleGroupItem>
-      </ToggleGroup>
-    </div>
-    <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
-      <span className="mr-1 text-[11px] text-white/45">{t("Vertical", "수직 과장")}</span>
-      <ToggleGroup type="single" value={String(st?.zex ?? 1)} onValueChange={(v) => v && set({ zex: +v })} className="gap-1.5">
-        {[1, 2, 5, 10].map((z) => <ToggleGroupItem key={z} value={String(z)} size="sm" className={pill}>{z}×</ToggleGroupItem>)}
-      </ToggleGroup>
-    </div>
   </>;
   const cur = snap?.apId ? (AIRPORTS as any)[snap.apId] : null;
   const fold = () => { setPickOpen(false); setPickHold(false); if (cur) { setRegion(cur.region); setCountry(countryOf(cur)); } };   // back to the airport on show
@@ -137,12 +148,11 @@ export function Simulator({ onHome }: { onHome: () => void }) {
       <canvas ref={canvas} className="absolute inset-0 block h-full w-full cursor-grab active:cursor-grabbing" />
 
       {/* top bar */}
-      <div className="pointer-events-none absolute top-0 right-0 left-0 flex items-center justify-between px-7 py-4 text-[11.5px] text-white/60 max-md:px-3 max-md:py-2.5">
+      <div className="pointer-events-none absolute top-0 right-0 left-0 flex items-center justify-between px-7 py-4 text-[11.5px] text-white/60 md:pl-[76px] max-md:px-3 max-md:py-2.5">
         <span className="flex items-center gap-3">
           <button type="button" onClick={onHome} className="pointer-events-auto flex items-center gap-1.5 text-[13px] font-medium text-white/80 transition hover:text-white">
             <svg viewBox="0 0 20 20" className="size-4" aria-hidden><path d="M16 10H4M9 5l-5 5 5 5" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>{t("Home", "홈")}
           </button>
-          <Button size="xs" className={`${pill} pointer-events-auto md:hidden`} onClick={() => setMenu((m) => !m)}>{menu ? t("Close", "닫기") : t("Controls", "메뉴")}</Button>
         </span>
         <span className="flex items-center gap-4">
           {ap && <span className="text-white/80 max-md:hidden">{ap.sub}</span>}
@@ -169,21 +179,31 @@ export function Simulator({ onHome }: { onHome: () => void }) {
         </div>
       </div>
 
-      {/* left panel */}
-      <div className={`absolute top-14 bottom-10 left-7 w-[310px] overflow-y-auto pr-2 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,.15)_transparent] max-md:inset-x-0 max-md:top-auto max-md:bottom-6 max-md:w-auto max-md:max-h-[50vh] max-md:rounded-t-2xl max-md:bg-[#0b0d10]/90 max-md:px-4 max-md:pt-3 max-md:pb-4 max-md:backdrop-blur ${menu ? "" : "max-md:hidden"}`}>
-        <H>{t("View", "보기")}</H>
-        <div className="flex flex-wrap gap-1.5">
-          <Button size="xs" className={pill} onClick={() => eng.current?.fit("all")}>{t("Overview", "전체")}</Button>
-          <Button size="xs" className={pill} onClick={() => eng.current?.fit("rwy")}>{t("Runway", "활주로")}</Button>
-          <Button size="xs" className={pill} onClick={() => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen())}>{fs ? t("Exit full screen", "전체 화면 종료") : t("Full screen", "전체 화면")}</Button>
-          <Toggle size="sm" className={pill} pressed={!!st?.rot} onPressedChange={(v) => set({ rot: v })}>{t("Auto-rotate", "자동 회전")}</Toggle>
-        </div>
+      {/* icon rail (left edge; bottom tab bar on phones) */}
+      <nav aria-label={t("Panels", "패널")} className="absolute top-0 bottom-0 left-0 z-10 flex w-[52px] flex-col items-center gap-1 border-r border-white/10 bg-[#0b0d10]/85 pt-16 backdrop-blur max-md:top-auto max-md:right-0 max-md:h-14 max-md:w-auto max-md:flex-row max-md:justify-around max-md:border-t max-md:border-r-0 max-md:pt-0">
+        {TABS.map(([k, en, kr, icon]) => (
+          <button key={k} type="button" title={t(en, kr)} aria-label={t(en, kr)} aria-pressed={tab === k} onClick={() => setTab(tab === k ? null : k)}
+            className={`relative grid size-10 place-items-center rounded-lg transition ${tab === k ? "bg-white/12 text-white" : "text-white/55 hover:bg-white/[.06] hover:text-white"}`}>
+            {tab === k && <span className="absolute top-2 bottom-2 -left-1.5 w-[3px] rounded-full bg-[#4f7dff] max-md:top-auto max-md:-bottom-1.5 max-md:left-2 max-md:right-2 max-md:h-[3px] max-md:w-auto" />}
+            {icon}
+          </button>
+        ))}
+      </nav>
 
-        <div className="mt-5 grid gap-3 xl:hidden">{picker("h-[104px]")}</div>
+      {/* panel of the selected icon */}
+      {tab && (
+        <div className="absolute top-14 left-[64px] z-10 max-h-[calc(100%-6rem)] w-[310px] overflow-y-auto rounded-xl border border-white/10 bg-[#0b0d10]/80 px-4 pt-3 pb-4 backdrop-blur [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,.15)_transparent] max-md:inset-x-0 max-md:top-auto max-md:bottom-14 max-md:left-0 max-md:w-auto max-md:max-h-[55vh] max-md:rounded-none max-md:rounded-t-2xl max-md:border-x-0">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-[14px] font-semibold text-white">{(() => { const x = TABS.find(([k]) => k === tab)!; return t(x[1], x[2]); })()}</span>
+            <button type="button" aria-label={t("Close", "닫기")} onClick={() => setTab(null)} className="grid size-7 place-items-center rounded text-white/45 transition hover:bg-white/[.06] hover:text-white">
+              <svg viewBox="0 0 20 20" className="size-4" aria-hidden><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="1.6" /></svg>
+            </button>
+          </div>
+
+          {tab === "ols" && <>
+            <div className="grid gap-3 xl:hidden">{picker("h-[104px]")}</div>
         {snap?.loading && <Note>{t("Loading airport data…", "공항 데이터를 불러오는 중…")}</Note>}
         {snap?.failed && <Note>{t("Could not load the airport data (network).", "공항 데이터를 불러오지 못했습니다 (네트워크).")}</Note>}
-        {ap && <Note>{ap.sub} · {t(`AD ${ap.E} m AMSL`, `공항표고 ${ap.E} m`)} · Annex 14 {t("code", "코드")} {ap.code} · {ap.dem === "ok" ? t("terrain loaded", "지형 불러옴") : ap.dem === "loading" ? t("terrain loading…", "지형 불러오는 중…") : ap.dem === "failed" ? t("terrain unavailable", "지형 사용 불가") : t("terrain none", "지형 없음")}</Note>}
-
         {ap && (
           <>
             <H>{t("Runways", "활주로")}</H>
@@ -208,10 +228,10 @@ export function Simulator({ onHome }: { onHome: () => void }) {
         </div>
         <Note>{t(`ICAO Annex 14 Vol. I Tab. 4-1 / 4-2, code ${ap?.code ?? 4}. Combined OLS = the lowest surface of the included runways.`, `ICAO Annex 14 Vol. I 표 4-1 / 4-2, 코드 ${ap?.code ?? 4}. 통합 OLS = 선택한 활주로들의 표면 중 가장 낮은 표면.`)}</Note>
 
-        {ap && st && (
-          <>
-            <H>{t("Scenario", "계획하기")}</H>
-            {ap.rwys.map((r: any, i: number) => {
+          </>}
+
+          {tab === "plan" && (ap && st ? <>
+                        {ap.rwys.map((r: any, i: number) => {
               const total = r.len + (st.extA[i] || 0) + (st.extB[i] || 0);
               return (
                 <div key={r.id} className="mb-2">
@@ -266,12 +286,9 @@ export function Simulator({ onHome }: { onHome: () => void }) {
             )}
             <Note>{t("Click a runway end to extend it; both ends can be extended at once. The new threshold is assumed at the existing end\u2019s elevation. \u201c+ ∥\u201d adds a parallel runway, centred on its reference, on the chosen side at the given centreline spacing; its length defaults to the reference runway. Threshold elevations are copied from the reference. \u201cExisting\u201d overlays the existing OLS (orange) for comparison.",
               "활주로 끝을 누르면 연장할 수 있고, 양쪽 끝을 함께 연장할 수도 있습니다. 새 시단의 표고는 기존 끝과 같다고 가정합니다. \u201c+ ∥\u201d는 기준 활주로를 중심으로 선택한 쪽에, 입력한 중심선 간격만큼 떨어진 평행활주로를 추가합니다. 길이와 시단 표고는 기준 활주로를 따릅니다. \u201c기존 OLS 비교\u201d를 켜면 기존 OLS(주황)가 겹쳐 보입니다.")}</Note>
-          </>
-        )}
+          </> : <Note>{t("Loading airport data…", "공항 데이터를 불러오는 중…")}</Note>)}
 
-        {!!ap?.procs?.length && (
-          <>
-            <H>{t("Flight procedures", "비행절차")}</H>
+          {tab === "proc" && (ap?.procs?.length ? <>
             <Toggle size="sm" className={pill} pressed={ap.procs.every((p: any) => st?.proc?.includes(p.id))} onPressedChange={(v) => set({ proc: v ? ap.procs.map((p: any) => p.id) : [] })}>{t("All", "전체")}</Toggle>
             {/* one row per runway: a button per runway end (with Z/Y/X when an end has several), ends in the runway's order */}
             {ap.rwys.map((r: any) => { const ps = ap.procs.filter((p: any) => p.rwy === r.nameA).concat(ap.procs.filter((p: any) => p.rwy === r.nameB)); if (!ps.length) return null;
@@ -285,17 +302,62 @@ export function Simulator({ onHome }: { onHome: () => void }) {
                 ))}
               </div>; })}
             <Note>{(PROC_NOTES as Record<string, string>)[snap?.apId ?? ""]} {t("Approaches at chart minimum altitudes, flown as straight legs; DME arcs drawn through intermediate points. Orange: missed approach; ≈ points approximate (2.5 % minimum climb).", "차트 최저고도로 그린 접근경로이며, 지점 사이는 직선, DME 호는 중간점으로 그렸습니다. 주황: 실패접근, ≈ 표시 지점은 근사값(최소 상승률 2.5 %).")}</Note>
-          </>
-        )}
-        <H>{t("Check", "검토")}</H>
+          </> : <Note>{t("No flight procedures for this airport yet. Available: Incheon, Gimpo, Jeju, Gimhae.", "이 공항은 아직 비행절차 자료가 없습니다. 지금은 인천·김포·제주·김해에 있습니다.")}</Note>)}
+
+          {tab === "check" && <>
         <div className="flex flex-wrap gap-1.5">
           <Toggle size="sm" className={pill} pressed={!!st?.obs} onPressedChange={(v) => set({ obs: v })}><span className="size-1.5 rounded-full bg-[#e0443e]" />{t("Buildings through them", "표면 침투 건물")}</Toggle>
           <Toggle size="sm" className={pill} pressed={!!st?.pen} onPressedChange={(v) => set({ pen: v })}><span className="size-1.5 rounded-full bg-[#c64545]" />{t("Terrain through them", "표면 침투 지형")}</Toggle>
           <Toggle size="sm" className={pill} pressed={!!st?.ofz} onPressedChange={(v) => set({ ofz: v })}>{t("OFZ (inner surfaces)", "OFZ (내측 표면)")}</Toggle>
         </div>
-        <div className="mt-2 grid gap-2 md:hidden">{groundVertical}</div>
+            <div className="mt-4 text-[11px] text-white/45">{t("Through the combined OLS", "통합 OLS 침투")} · {scenName}</div>
+            {!stats ? <Note>{t("Computing…", "계산 중…")}</Note> : <div className="mt-2 space-y-2.5 rounded-lg border border-white/10 bg-white/[.03] p-3 text-[11.5px]">
+              <div className="flex items-baseline justify-between gap-2"><span className="text-white/60">{t("Buildings through", "침투 건물")}</span>
+                {st?.obs ? <b className="font-mono text-white">{stats.obsBad.length.toLocaleString("en")} <span className="font-normal text-white/45">/ {stats.obsChecked.toLocaleString("en")}</span></b> : <span className="text-white/45">{t("turn on buildings above", "위에서 침투 건물을 켜세요")}</span>}</div>
+              {st?.obs && stats.obsBad[0] && <div className="text-white/60">{t("Worst", "최대")}: <span className="text-white">{stats.obsBad[0].name ?? (ko ? tagKo(stats.obsBad[0].tag) : stats.obsBad[0].tag)}</span> <span className="font-mono text-[#f0625c]">+{fmt(stats.obsBad[0].pen)} m</span> <span className="text-white/45">· {sn(stats.obsBad[0].surface)}</span></div>}
+              <div className="flex items-baseline justify-between gap-2"><span className="text-white/60">{t("Terrain through", "침투 지형")}</span><b className="font-mono text-white">{stats.area} km²</b></div>
+              {stats.worst && <div className="text-white/60">{t("Worst", "최대")}: <span className="font-mono text-[#f0625c]">+{fmt(stats.worst.pen)} m</span> <span className="text-white/45">· {sn(stats.worst.surface)}</span></div>}
+              {(Object.values(stats.bySurface) as any[]).sort((a, b) => b.area - a.area).map((b) => (
+                <div key={b.name} className="flex justify-between font-mono text-[10.5px] text-white/50"><span className="font-sans">{sn(b.name)}</span><span>{b.area} km² · +{fmt(b.max)} m</span></div>))}
+            </div>}
+          </>}
+
+          {tab === "map" && <>
+        <div className="flex flex-wrap gap-1.5">
+          <Button size="xs" className={pill} onClick={() => eng.current?.fit("all")}>{t("Overview", "전체")}</Button>
+          <Button size="xs" className={pill} onClick={() => eng.current?.fit("rwy")}>{t("Runway", "활주로")}</Button>
+          <Button size="xs" className={pill} onClick={() => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen())}>{fs ? t("Exit full screen", "전체 화면 종료") : t("Full screen", "전체 화면")}</Button>
+          <Toggle size="sm" className={pill} pressed={!!st?.rot} onPressedChange={(v) => set({ rot: v })}>{t("Auto-rotate", "자동 회전")}</Toggle>
+        </div>
+
+            <H>{t("Ground", "바닥")}</H>
+            <ToggleGroup type="single" value={st?.base ?? "sat"} onValueChange={(v) => v && set({ base: v })} className="justify-start gap-1.5">
+              <ToggleGroupItem value="sat" size="sm" className={pill}>{t("Satellite", "위성")}</ToggleGroupItem>
+              <ToggleGroupItem value="osm" size="sm" className={pill}>{t("OSM", "지도")}</ToggleGroupItem>
+              <ToggleGroupItem value="none" size="sm" className={pill}>{t("None", "없음")}</ToggleGroupItem>
+            </ToggleGroup>
+            <H>{t("Vertical exaggeration", "수직 과장")}</H>
+            <ToggleGroup type="single" value={String(st?.zex ?? 1)} onValueChange={(v) => v && set({ zex: +v })} className="justify-start gap-1.5">
+              {[1, 2, 5, 10].map((z) => <ToggleGroupItem key={z} value={String(z)} size="sm" className={pill}>{z}×</ToggleGroupItem>)}
+            </ToggleGroup>
+          </>}
+
+          {tab === "info" && <>
+        {ap && <Note>{ap.sub} · {t(`AD ${ap.E} m AMSL`, `공항표고 ${ap.E} m`)} · Annex 14 {t("code", "코드")} {ap.code} · {ap.dem === "ok" ? t("terrain loaded", "지형 불러옴") : ap.dem === "loading" ? t("terrain loading…", "지형 불러오는 중…") : ap.dem === "failed" ? t("terrain unavailable", "지형 사용 불가") : t("terrain none", "지형 없음")}</Note>}
+
+            {ap?.assume && <p className="mt-3 text-[11px] leading-relaxed text-white/55 [&_b]:font-semibold [&_b]:text-white/80" dangerouslySetInnerHTML={{ __html: ap.assume }} />}
         <Note>{t(`Buildings: OSM height / levels tags, untagged ones assumed ${st?.bldH ?? 6} m. Terrain: ${ap?.demSrc ?? "—"}.`, `건물: OSM 높이·층수 태그 사용, 태그가 없으면 ${st?.bldH ?? 6} m로 가정. 지형: ${ap?.demSrc ?? "—"}.`)}</Note>
-      </div>
+            <Note>Terrain GEDTM30 © OpenGeoHub (CC BY 4.0) · Buildings © OpenStreetMap contributors (ODbL) · Imagery © Esri</Note>
+          </>}
+
+          {tab === "report" && <>
+            <p className="text-[12px] leading-relaxed text-white/65">{t("Obstacle list of the current scenario as a CSV file (opens in Excel): buildings through the combined OLS, worst first, and terrain penetration per surface.", "현재 시나리오의 장애물 목록을 CSV 파일(엑셀에서 열림)로 내려받습니다. 통합 OLS를 침투하는 건물(큰 순)과 표면별 지형 침투가 들어갑니다.")}</p>
+            <div className="mt-2 text-[11px] text-white/45">{snap?.apId} · {scenName}{stats && st?.obs ? ` · ${t("buildings through", "침투 건물")} ${stats.obsBad.length}` : ""}</div>
+            <Button size="sm" className="mt-4 h-8 rounded-md bg-[#3f6bff] px-4 text-[12.5px] text-white hover:bg-[#5a80ff]" onClick={downloadCsv} disabled={!ap}>{t("Download CSV", "CSV 내려받기")}</Button>
+            {!st?.obs && <Note>{t("Buildings are off (Review), so the file has terrain only.", "검토에서 침투 건물이 꺼져 있어 지형만 들어갑니다.")}</Note>}
+          </>}
+        </div>
+      )}
 
       {/* right: altitude read-out */}
       <div className="pointer-events-none absolute top-14 right-7 w-[230px] text-[11.5px] max-md:top-12 max-md:right-3 max-md:w-[170px] max-md:text-[10.5px]">
@@ -328,10 +390,9 @@ export function Simulator({ onHome }: { onHome: () => void }) {
       </div>
 
       <div className="absolute right-7 bottom-9 flex flex-col items-end gap-2 max-md:hidden">
-        {groundVertical}
         <span className="pointer-events-none mt-1 font-mono text-[11.5px] tracking-wide text-white/60">{ap ? `${Math.abs(ap.origin[0]).toFixed(4)}°${ap.origin[0] < 0 ? "S" : "N"}  ${Math.abs(ap.origin[1]).toFixed(4)}°${ap.origin[1] < 0 ? "W" : "E"}` : ""}</span>
       </div>
-      <div className="pointer-events-none absolute right-7 bottom-3 left-7 flex justify-between text-[10.5px] text-white/35 max-md:inset-x-3 max-md:bottom-1 max-md:text-[9px]">
+      <div className="pointer-events-none absolute right-7 bottom-3 left-[76px] flex justify-between text-[10.5px] text-white/35 max-md:inset-x-3 max-md:bottom-[60px] max-md:text-[9px]">
         <span className="max-md:hidden">{t("Drag to orbit · scroll to zoom · right-drag to pan · hover a building for its clearance", "드래그: 회전 · 스크롤: 확대·축소 · 오른쪽 드래그: 이동 · 건물에 마우스를 올리면 여유고 표시")}</span>
         <span className="truncate">Terrain GEDTM30 © OpenGeoHub (CC BY 4.0) · Buildings © OpenStreetMap contributors · Imagery © Esri</span>
       </div>

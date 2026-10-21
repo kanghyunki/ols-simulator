@@ -16,13 +16,13 @@ ICAO Annex 14 장애물제한표면(OLS)을 실제 지형·건물 위에 3D로 �
 | 단계 | 조작 | 기대 결과 |
 |---|---|---|
 | ① | https://ols-simulator.vercel.app 접속 → **Explore(시작하기)** 클릭 | 랜딩 화면에서 시뮬레이터로 전환 |
-| ② | 화면 위쪽 선택 바(Region › Country › Airport / 지역 › 국가 › 공항)에서 **Oceania › Papua New Guinea › Jacksons Intl** (오세아니아 › 파푸아뉴기니 › Jacksons Intl) | OLS 표면이 지형(GEDTM30)·OSM 건물과 함께 3D로 표시. 기본 6개(착륙대·진입·이륙상승·전이·내부수평·원추), 왼쪽 **Check › OFZ (검토 › OFZ)** 를 켜면 OFZ 3개(내부진입·내부전이·착륙복행)까지 9개 |
-| ③ | 왼쪽 패널 **Scenario(시나리오)** 에서 RWY 14L/32R의 **14L** 클릭 → 슬라이더로 **+500 m** | 활주로 길이 **2750 → 3250 m**, 연장된 진입·이륙상승표면이 바깥쪽으로 이동 |
-| ④ | **Existing(기존 OLS 비교)** 켜고 지표면에 마우스 올리기 | 기존 OLS(주황)와 비교, 오른쪽 **Altitude(고도)** 에 제한고 표시. 내부수평표면 = 공항표고 39 m + 45 m = **84 m** |
+| ② | 화면 위쪽 선택 바(Region › Country › Airport / 지역 › 국가 › 공항)에서 **Oceania › Papua New Guinea › Jacksons Intl** (오세아니아 › 파푸아뉴기니 › Jacksons Intl) | OLS 표면이 지형(GEDTM30)·OSM 건물과 함께 3D로 표시. 기본 6개(착륙대·진입·이륙상승·전이·내부수평·원추), 왼쪽 아이콘 레일의 **Review(검토)** 패널에서 **OFZ** 를 켜면 OFZ 3개(내부진입·내부전이·착륙복행)까지 9개 |
+| ③ | 왼쪽 아이콘 레일의 **Planning(계획하기)** 패널에서 RWY 14L/32R의 **14L** 클릭 → 슬라이더로 **+500 m** | 활주로 길이 **2750 → 3250 m**, 연장된 진입·이륙상승표면이 바깥쪽으로 이동 |
+| ④ | 같은 패널에서 **Existing(기존 OLS 비교)** 켜고 지표면에 마우스 올리기 | 기존 OLS(주황)와 비교, 오른쪽 **Altitude(고도)** 에 제한고 표시. 내부수평표면 = 공항표고 39 m + 45 m = **84 m** |
 
 - 허용 편차: 표면 제한고는 Annex 14 수기 계산 대비 ±0.5 m. 지형고는 GEDTM30 원자료 정확도(수 m) 범위.
-- 화면 폭이 1280 px 미만(노트북 일부·휴대폰)이면 선택 바가 왼쪽 패널(휴대폰은 **Controls(메뉴)**) 안에 있습니다.
-- 제출 이후 바뀐 점: 사이트 첫 화면에 랜딩 페이지가 추가되어 **Explore(시작하기)** 를 한 번 더 누릅니다(①). 공항 선택은 왼쪽 버튼에서 위쪽 선택 바로 옮겨졌습니다(②).
+- 화면 폭이 1280 px 미만(노트북 일부·휴대폰)이면 선택 바가 **Obstacle surfaces(장애물제한표면)** 패널 안에 있습니다. 휴대폰은 아이콘 레일이 화면 아래 탭 바입니다.
+- 제출 이후 바뀐 점: 사이트 첫 화면에 랜딩 페이지가 추가되어 **Explore(시작하기)** 를 한 번 더 누릅니다(①). 공항 선택은 왼쪽 버튼에서 위쪽 선택 바로 옮겨졌습니다(②). 왼쪽 메뉴는 아이콘 레일(패널 7개)로 바뀌었습니다(②~④).
 
 ## 내 PC에서 실행
 
@@ -43,7 +43,7 @@ npm run dev
 | 지형(GEDTM30 내장 / 온라인 지형 타일), 지형·건물 침투 판정 | `src/lib/ols-engine.js` (`demAt`, `penColor`, `buildObstacles`, `stats`) |
 | 활주로 연장·평행활주로 시나리오, 기존 OLS 비교 | `src/lib/ols-engine.js` (`frames`, `setExt`), `src/components/simulator.tsx` |
 | 계기접근절차(ILS, 실패접근) 3D 표시 — 인천 8개(활주로 양방향)·김포 5개·제주 4개·김해 1개, 연장 시 경로 이동, 항공기 이착륙 애니메이션(인천은 활주로별 이륙·착륙 전용 운영) | `src/data/procedures.js`, `src/lib/ols-engine.js` (`buildProcs`, `procShift`) |
-| 화면(공항 선택, 표면 토글, 고도 판독) | `src/components/simulator.tsx` |
+| 화면(아이콘 레일과 패널 7개: 표면·계획·비행절차·검토·지도·자료·보고서, 공항 선택, 고도 판독, 침투 요약과 CSV 보고서) | `src/components/simulator.tsx`, `src/lib/ols-engine.js` (`stats`) |
 | 공항 레지스트리(37개 공항: 활주로 시단 좌표·표고, 가정값 안내) | `src/data/airports.js` |
 | 공항별 OSM 활주로·건물·도로 데이터 / 지형 격자 | `public/data/osm_*.js`, `public/dem/*.bin` |
 | 랜딩·Product·Project·About·Contact·Log in·Sign up 페이지 | `src/app/` |
