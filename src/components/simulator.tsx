@@ -85,7 +85,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
   const [sel, setSel] = useState<Set<string>>(new Set());   // runway ends picked for extension (while still at 0 m)
   const [fs, setFs] = useState(false);
   const [tab, setTab] = useState<Tab | null>(null);   // open panel; none on phones at first, so the 3D view shows
-  useEffect(() => { if (matchMedia("(min-width: 768px)").matches) setTab("ols"); }, []);
+  useEffect(() => { if (new URLSearchParams(location.search).get("noise")) setTab("noise"); else if (matchMedia("(min-width: 768px)").matches) setTab("ols"); }, []);   // ?noise=1 opens on Noise exposure
   const [stats, setStats] = useState<any>(null);       // Review / Report: penetrations of the current scenario
   const [layerOpen, setLayerOpen] = useState(false);
   // Noise and OLS take turns: opening Noise exposure hides the surfaces and the terrain penetration (remembered), opening

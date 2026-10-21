@@ -5,7 +5,7 @@ import { Logo } from "@/components/logo";
 import { SiteNav } from "@/components/site-nav";
 import { useT } from "@/lib/lang";
 
-// Product: two products, one screen each. Each shows its screenshot in a device drawn in CSS (laptop or phone);
+// Product: one screen per product. Each shows its screenshot in a device drawn in CSS (laptop or phone);
 // PREVIEW swaps to the other device with that device's screenshot. Shots: public/product, taken from the simulator.
 type Device = "laptop" | "phone";
 
@@ -84,6 +84,10 @@ export default function ProductPage() {
       <Product n="02" name="Flight Procedure Simulator" title={t("Approaches you can walk around.", "직접 둘러보는 접근절차.")}
         body={t("Instrument approaches and missed approaches from the AIP, drawn at their charted altitudes over the terrain and the OLS.", "AIP의 계기접근절차와 실패접근절차를 차트 고도 그대로, 지형과 OLS 위에 그립니다.")}
         shots={{ laptop: "/product/fps-desktop.jpg", phone: "/product/fps-mobile.jpg" }} href="/?proc=all#ICN" start="phone" flip mark="33L" />
+
+      <Product n="03" name="Noise Exposure" title={t("Lden contours from the real traffic.", "실제 운항으로 그린 Lden 등고선.")}
+        body={t("ICAO Doc 9911 / ECAC Doc 29 segment method with ANP noise-power-distance data: annual movements, fleet mix and runway roles become noise zones over the terrain, with the area of each band.", "ICAO Doc 9911 / ECAC Doc 29 구간법과 ANP 소음-출력-거리 자료로 연간 운항, 기종 구성, 활주로 운영을 지형 위의 소음대책지역으로 그리고, 구역별 면적을 셉니다.")}
+        shots={{ laptop: "/product/noise-desktop.jpg", phone: "/product/noise-mobile.jpg" }} href="/?noise=1#ICN" start="laptop" mark="34L" />
 
       <footer className="mx-[4.5vw] flex items-center justify-between border-t border-white/[.07] py-6 text-[12.5px] text-white/40 max-md:mx-5">
         <Link href="/" className="transition hover:text-white/70"><Logo /></Link><span>© 2026 OLS Simulator</span>
