@@ -87,7 +87,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
   const [tab, setTab] = useState<Tab | null>(null);   // open panel; none on phones at first, so the 3D view shows
   useEffect(() => { if (new URLSearchParams(location.search).get("noise")) setTab("noise"); else if (matchMedia("(min-width: 768px)").matches) setTab("ols"); }, []);   // ?noise=1 opens on Noise exposure
   const [stats, setStats] = useState<any>(null);       // Review / Report: penetrations of the current scenario
-  const [layerOpen, setLayerOpen] = useState(false);
+  const [layerOpen, setLayerOpen] = useState(false), [viewOpen, setViewOpen] = useState(false);   // viewOpen: the view box on phones
   // Noise and OLS take turns: opening Noise exposure hides the surfaces and the terrain penetration (remembered), opening
   // Obstacle surfaces turns the noise contours off and brings them back
   const olsPrev = useRef<{ surf: string[]; pen: boolean } | null>(null);
@@ -201,15 +201,15 @@ export function Simulator({ onHome }: { onHome: () => void }) {
       </div>
 
       {/* icon rail (left edge; bottom tab bar on phones) */}
-      <nav aria-label={t("Panels", "패널")} className="absolute top-0 bottom-0 left-0 z-10 flex w-[52px] flex-col items-center gap-1 border-r border-white/10 bg-[#0b0d10]/85 pt-3 backdrop-blur max-md:top-auto max-md:right-0 max-md:h-14 max-md:w-auto max-md:flex-row max-md:justify-around max-md:border-t max-md:border-r-0 max-md:pt-0">
+      <nav aria-label={t("Panels", "패널")} className="absolute top-0 bottom-0 left-0 z-10 flex w-[52px] flex-col items-center gap-1 border-r border-white/10 bg-[#0b0d10]/85 pt-3 backdrop-blur max-md:top-auto max-md:right-0 max-md:h-14 max-md:w-auto max-md:flex-row max-md:justify-around max-md:border-t max-md:border-r-0 max-md:bg-[#0b0d10]/95 max-md:pt-0">
         <button type="button" title={t("Home", "홈")} aria-label={t("Home", "홈")} onClick={onHome}
-          className="grid size-10 place-items-center rounded-lg text-white/70 transition hover:bg-white/[.06] hover:text-white">
+          className="grid size-10 place-items-center rounded-lg text-white/70 transition hover:bg-white/[.06] hover:text-white max-md:text-white/85">
           {ic("M3 9.5L10 3.5l7 6M5 8v8.5h3.5v-5h3v5H15V8")}
         </button>
         <span className="my-2 h-px w-6 bg-white/10 max-md:mx-0 max-md:my-0 max-md:h-6 max-md:w-px" />
         {TABS.map(([k, en, kr, icon]) => (
           <button key={k} type="button" title={t(en, kr)} aria-label={t(en, kr)} aria-pressed={tab === k} onClick={() => setTab(tab === k ? null : k)}
-            className={`relative grid size-10 place-items-center rounded-lg transition ${tab === k ? "bg-white/12 text-white" : "text-white/55 hover:bg-white/[.06] hover:text-white"}`}>
+            className={`relative grid size-10 place-items-center rounded-lg transition ${tab === k ? "bg-white/12 text-white" : "text-white/55 hover:bg-white/[.06] hover:text-white max-md:text-white/85"}`}>
             {tab === k && <span className="absolute top-2 bottom-2 -left-1.5 w-[3px] rounded-full bg-[#4f7dff] max-md:top-auto max-md:-bottom-1.5 max-md:left-2 max-md:right-2 max-md:h-[3px] max-md:w-auto" />}
             {icon}
           </button>
@@ -392,7 +392,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
       )}
 
       {/* right: altitude read-out */}
-      <div className="pointer-events-none absolute top-14 right-7 w-[230px] text-[11.5px] max-md:top-12 max-md:right-3 max-md:w-[170px] max-md:text-[10.5px]">
+      <div className="pointer-events-none absolute top-14 right-7 w-[230px] text-[11.5px] max-md:inset-x-3 max-md:top-12 max-md:w-auto max-md:text-[10.5px]">
         <div className="text-[13px] font-semibold text-white">{t("Altitude", "고도")}</div>
         {hover?.kind === "obstacle" ? (
           <div className="mt-2 space-y-0.5">
@@ -415,8 +415,8 @@ export function Simulator({ onHome }: { onHome: () => void }) {
             {hover.lden != null && isFinite(hover.lden) && <div>Lden <b className="font-mono text-white">{fmt(hover.lden)} dB</b>{(() => { const b = [...(snap?.noise?.bands ?? [])].reverse().find((x: any) => hover.lden >= x.lo); return b ? <span style={{ color: b.color }}> · {t(b.en, b.ko)}</span> : null; })()}</div>}
             <div className="font-mono text-[10.5px] text-white/40">{t(<>s {fmt(hover.s, 0)} m · d {fmt(hover.d, 0)} m from THR {hover.refA}</>, <>THR {hover.refA} 기준 s {fmt(hover.s, 0)} m · d {fmt(hover.d, 0)} m</>)}</div>
           </div>
-        ) : <div className="mt-2 text-white/45">{t("Move over a surface or a building.", "표면이나 건물 위에 마우스를 올려 보세요.")}</div>}
-        <div className="mt-5 space-y-1">
+        ) : <div className="mt-2 text-white/45 max-md:hidden">{t("Move over a surface or a building.", "표면이나 건물 위에 마우스를 올려 보세요.")}</div>}
+        <div className="mt-5 space-y-1 max-md:mt-2 max-md:flex max-md:flex-wrap max-md:gap-x-3 max-md:gap-y-1 max-md:space-y-0">
           {surfaces.filter(([k]) => surf.has(k)).map(([k, label, c]) => <div key={k} className="flex items-center gap-2"><span className="h-[2px] w-5" style={{ background: hex(c) }} /><span style={{ color: hex(c) }}>{sn(label)}</span></div>)}
           {st?.scen === "cmp" && <div className="flex items-center gap-2"><span className="h-[2px] w-5 bg-[#cc785c]" /><span className="text-[#cc785c]">{t("Extended OLS", "연장 후 OLS")}</span></div>}
         </div>
@@ -443,8 +443,8 @@ export function Simulator({ onHome }: { onHome: () => void }) {
       </div>
 
       {/* bottom right: view and elevation scale, above the coordinates */}
-      <div className="absolute right-7 bottom-9 z-10 flex flex-col items-end gap-2 max-md:right-3 max-md:bottom-[152px]">
-        <div className="rounded-xl border border-white/10 bg-[#0b0d10]/80 p-2.5 backdrop-blur max-md:max-w-[calc(100vw-108px)]">
+      <div className="absolute right-7 bottom-9 z-10 flex flex-col items-end gap-2 max-md:right-3 max-md:bottom-[80px]">
+        <div className={`rounded-xl border border-white/10 bg-[#0b0d10]/80 p-2.5 backdrop-blur max-md:max-w-[calc(100vw-108px)] max-md:bg-[#0b0d10]/95 ${viewOpen ? "" : "max-md:hidden"}`}>
           <div className="mb-1.5 text-[11px] text-white/50">{t("View", "화면 선택")}</div>
           <div className="flex flex-wrap gap-1.5">
             <Button size="xs" className={pill} onClick={() => eng.current?.fit("all")}>{t("Overview", "전체")}</Button>
@@ -458,6 +458,10 @@ export function Simulator({ onHome }: { onHome: () => void }) {
           </ToggleGroup>
         </div>
         <span className="pointer-events-none mt-1 font-mono max-md:hidden text-[11.5px] tracking-wide text-white/60">{ap ? `${Math.abs(ap.origin[0]).toFixed(4)}°${ap.origin[0] < 0 ? "S" : "N"}  ${Math.abs(ap.origin[1]).toFixed(4)}°${ap.origin[1] < 0 ? "W" : "E"}` : ""}</span>
+        <button type="button" aria-expanded={viewOpen} aria-label={t("View", "화면 선택")} onClick={() => setViewOpen((o) => !o)}
+          className={`grid size-11 place-items-center rounded-full border border-white/15 bg-[#0b0d10]/90 text-white/85 shadow-lg backdrop-blur md:hidden ${viewOpen ? "border-white/40 bg-white/15" : ""}`}>
+          {ic("M3 10h14M10 3v14M5.5 5.5l9 9M14.5 5.5l-9 9")}
+        </button>
       </div>
       <div className="pointer-events-none absolute right-7 bottom-3 left-[76px] flex justify-between text-[10.5px] text-white/35 max-md:inset-x-3 max-md:bottom-[60px] max-md:text-[9px]">
         <span className="max-md:hidden">{t("Drag to orbit · scroll to zoom · right-drag to pan · hover a building for its clearance", "드래그: 회전 · 스크롤: 확대·축소 · 오른쪽 드래그: 이동 · 건물에 마우스를 올리면 여유고 표시")}</span>
