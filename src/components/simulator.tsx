@@ -158,7 +158,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
   // Runway on/off, shared by the Obstacle surfaces and Noise exposure panels
   const runwayButtons = ap && <>
             <H>{t("Runways", "활주로")}</H>
-            <Toggle size="sm" className={pill} pressed={ap.rwys.every((r: any) => r.on)} onPressedChange={() => ap.rwys.forEach((_: any, i: number) => eng.current?.setRunway(i, true))}>{t("All runways", "전체 활주로")}</Toggle>
+            <Toggle size="sm" className={pill} pressed={ap.rwys.every((r: any) => r.on)} onPressedChange={(v) => ap.rwys.forEach((_: any, i: number) => eng.current?.setRunway(i, v))}>{t("All runways", "전체 활주로")}</Toggle>
             <div className={grid2}>
               {ap.rwys.map((r: any, i: number) => <Toggle key={r.id} size="sm" className={cell} pressed={r.on} onPressedChange={(v) => eng.current?.setRunway(i, v)}><span className="truncate">{r.id}</span> <span className="ml-auto font-mono text-[10px] text-white/45">{r.len.toLocaleString("en")}m</span></Toggle>)}
             </div>
@@ -237,7 +237,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
         )}
 
         <H>{t("Obstacle surfaces", "장애물제한표면")}</H>
-        <Toggle size="sm" className={pill} pressed={surf.size === surfaces.length} onPressedChange={() => set({ surf: ALL_KEYS })}>{t("All", "전체")}</Toggle>
+        <Toggle size="sm" className={pill} pressed={surfaces.every(([k]) => surf.has(k))} onPressedChange={(v) => set({ surf: v ? ALL_KEYS : [] })}>{t("All", "전체")}</Toggle>
         <div className={grid2}>
           {surfaces.map(([k, label, c]) => (
             <span key={k} className="flex min-w-0 items-center gap-1">
