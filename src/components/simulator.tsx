@@ -464,7 +464,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
         </button>
       </div>
       <div className="pointer-events-none absolute right-7 bottom-3 left-[76px] flex justify-between text-[10.5px] text-white/35 max-md:inset-x-3 max-md:bottom-[60px] max-md:text-[9px]">
-        <span className="max-md:hidden">{t("Drag to orbit · scroll to zoom · right-drag to pan · hover a building for its clearance", "드래그: 회전 · 스크롤: 확대·축소 · 오른쪽 드래그: 이동 · 건물에 마우스를 올리면 여유고 표시")}</span>
+        <span className="max-md:hidden">{t("Drag to move · middle- or right-drag to orbit · scroll to zoom · hover a building for its clearance", "드래그: 이동 · 휠 버튼(또는 오른쪽) 드래그: 회전 · 스크롤: 확대·축소 · 건물에 마우스를 올리면 여유고 표시")}</span>
         <span className="truncate">Terrain GEDTM30 © OpenGeoHub (CC BY 4.0) · Buildings © OpenStreetMap contributors · Imagery © Esri</span>
       </div>
     </div>

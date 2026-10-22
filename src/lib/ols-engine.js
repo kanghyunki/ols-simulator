@@ -255,6 +255,9 @@ export function createEngine(canvas, cb) {
   const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0b0d10);
   const camera = new THREE.PerspectiveCamera(50, 1, 20, 150000);
   const ctl = new OrbitControls(camera, canvas); ctl.enableDamping = true; ctl.autoRotate = true; ctl.autoRotateSpeed = 0.5; ctl.maxPolarAngle = Math.PI / 2 - 0.03;
+  // map-style mouse: left drag grabs and slides the ground, middle (or right) drag orbits, wheel zooms; Shift + left also orbits
+  ctl.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.ROTATE }; ctl.screenSpacePanning = false;
+  ctl.dampingFactor = 0.25; ctl.panSpeed = 1.4;   // follow the pointer closely (default damping 0.05 trails it noticeably)
   scene.add(new THREE.HemisphereLight(0xffffff, 0x2a2d33, 0.75));
   const sun = new THREE.DirectionalLight(0xffffff, 1.1); sun.position.set(-1, 0.6, -1); scene.add(sun);   // low sun from the north-west, like a hillshade
   const G = new THREE.Group(); G.scale.y = state.zex; scene.add(G);          // metres. ENU (x,y,z) → three (x, z, -y). G.scale.y = vertical exaggeration
@@ -656,8 +659,8 @@ export function createEngine(canvas, cb) {
   function destroy() { alive = false; canvas.removeEventListener('pointermove', onMove); ctl.dispose(); renderer.dispose(); }
 
   resize(); loop();
-  // console probes for terrain checks: __ols.probe.dem(x, y), __ols.probe.ols(x, y), __ols.probe.xy(lat, lon)
-  const probe = { noiseEdge: () => noiseEdge(), dem: (x, y) => demAt(x, y), ols: (x, y) => ols([x, y], frames(true)), xy: (lat, lon) => LL(AP, [lat, lon]), rws: () => frames(false).map(f => ({ A: f.A, B: f.B, eA: f.eA, eB: f.eB })), demInfo: () => AP.dem && { src: AP.dem.src, dx: AP.dem.dx, dy: AP.dem.dy, nx: AP.dem.nx, ny: AP.dem.ny } };
+  // console probes for terrain checks: __ols.probe.dem(x, y), __ols.probe.ols(x, y), __ols.probe.xy(lat, lon), __ols.probe.cam(x, y, h, tx, ty)
+  const probe = { noiseEdge: () => noiseEdge(), dem: (x, y) => demAt(x, y), ols: (x, y) => ols([x, y], frames(true)), xy: (lat, lon) => LL(AP, [lat, lon]), cam: (x, y, h, tx, ty) => { state.rot = false; camera.position.set(x, h, -y); ctl.target.set(tx, 0, -ty); ctl.update(); }, rws: () => frames(false).map(f => ({ A: f.A, B: f.B, eA: f.eA, eB: f.eB })), demInfo: () => AP.dem && { src: AP.dem.src, dx: AP.dem.dx, dy: AP.dem.dy, nx: AP.dem.nx, ny: AP.dem.ny } };
   const noiseEdge = () => { const g = NZ.grid; if (!g) return null; let m = -1e9; for (let i = 0; i < g.nx; i++) m = Math.max(m, g.L[i], g.L[(g.ny - 1) * g.nx + i]); for (let j = 0; j < g.ny; j++) m = Math.max(m, g.L[j * g.nx], g.L[j * g.nx + g.nx - 1]); return +m.toFixed(1); };
   const debug = () => ({ hi: { on: hiU.hiOn.value, rect: hiU.hiRect.value.toArray().map(Math.round), w: hiCv.width, h: hiCv.height, img: hiCv.width ? hiCv.toDataURL('image/jpeg', .4) : null, mat: !!L.ground?.material.onBeforeCompile }, planes: planes.map(p => ({ T: p.seq.map(q => Math.round(q.tr.T)), gap: p.seq.map(q => +q.gap.toFixed(1)), pool: p.pool.length, live: p.live, pos: p.pool.filter(o => o.visible).map(o => o.position.toArray().map(Math.round)) })), pending: texPending, K: { ...K }, texW: texCv.width, texH: texCv.height, hsW: hsCv.width, tex: texCv.toDataURL('image/jpeg', .5), hs: hsCv.width ? hsCv.toDataURL('image/jpeg', .5) : null });
   return { switchAirport, set, setExt, setRunway, fit, resize, destroy, snapshot, stats, debug, probe };
