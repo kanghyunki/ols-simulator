@@ -136,6 +136,9 @@ export function createEngine(canvas, cb) {
     // With several runways the inner horizontal is their union: the conical starts at its outer edge, so a runway's
     // conical must not show inside another runway's inner horizontal
     if ('ih' in o) delete o.conical;
+    // The inner horizontal starts where the transitional surfaces reach its height: it is not drawn over the strip, the
+    // transitional or the part of an approach still below it, so their colours are not tinted by it
+    if ('ih' in o && ['strip', 'transitional', 'approach'].some(k => o[k] < o.ih)) delete o.ih;
     return o; }
   // Combined OLS = minimum over the included runways
   function ols(P, rws, allow) { let best = null;
