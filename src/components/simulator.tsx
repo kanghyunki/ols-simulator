@@ -6,9 +6,9 @@ import { LangButton } from "@/components/lang-button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PROCEDURES, PROC_NOTES } from "@/data/procedures.js";
 import { useT } from "@/lib/lang";
-import { createEngine, AIRPORTS, SURFACES as _S, OFZ_SURFACES as _O, ALL_KEYS as _K } from "@/lib/ols-engine.js";
+import { createEngine, AIRPORTS, SURFACES as _S, OFZ_SURFACES as _O, ALL_KEYS as _K, DEFAULT_KEYS as _D } from "@/lib/ols-engine.js";
 type Surf = [string, string, number];
-const SURFACES = _S as unknown as Surf[], OFZ_SURFACES = _O as unknown as Surf[], ALL_KEYS = _K as string[];
+const SURFACES = _S as unknown as Surf[], OFZ_SURFACES = _O as unknown as Surf[], ALL_KEYS = _K as string[], DEFAULT_KEYS = _D as string[];
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Engine = ReturnType<typeof createEngine>;
@@ -93,7 +93,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
   const olsPrev = useRef<{ surf: string[]; pen: boolean } | null>(null);
   useEffect(() => { const e = eng.current, s = e?.snapshot().state; if (!e || !s) return;
     if (tab === "noise") { if (s.surf.length) olsPrev.current = { surf: s.surf as string[], pen: !!s.pen }; e.set({ noise: true, surf: [], pen: false }); }
-    else if (tab === "ols" && s.noise) { const p = olsPrev.current; e.set({ noise: false, surf: p?.surf.length ? p.surf : ALL_KEYS, pen: p?.pen ?? true }); }
+    else if (tab === "ols" && s.noise) { const p = olsPrev.current; e.set({ noise: false, surf: p?.surf.length ? p.surf : DEFAULT_KEYS, pen: p?.pen ?? true }); }
   }, [tab]);
   // Top picker: folded to one line; unfolds on hover / focus / click, folds again once an airport is picked
   // (hold keeps it folded under the pointer until the pointer leaves)
@@ -139,7 +139,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
     a.href = URL.createObjectURL(new Blob(["\ufeff" + rows.map((x) => x.map(q).join(",")).join("\r\n")], { type: "text/csv" }));
     a.download = `OLS_${r.apId}_${st?.scen === "ex" ? "existing" : "planned"}.csv`; a.click(); URL.revokeObjectURL(a.href); };
   const set = (p: Record<string, unknown>) => eng.current?.set(p);
-  const surf = new Set<string>(st?.surf ?? ALL_KEYS);
+  const surf = new Set<string>(st?.surf ?? DEFAULT_KEYS);
   const surfaces = st?.ofz ? [...SURFACES, ...OFZ_SURFACES] : SURFACES;
   const airports = Object.entries(AIRPORTS as Record<string, any>).filter(([, a]) => a.region === region && countryOf(a) === country);
   const picker = (rows: string, picked?: () => void) => <>
@@ -237,7 +237,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
         )}
 
         <H>{t("Obstacle surfaces", "장애물제한표면")}</H>
-        <Toggle size="sm" className={pill} pressed={surfaces.every(([k]) => surf.has(k))} onPressedChange={(v) => set({ surf: v ? ALL_KEYS : [] })}>{t("All", "전체")}</Toggle>
+        <Toggle size="sm" className={pill} pressed={surfaces.every(([k]) => k === "takeoff" || surf.has(k))} onPressedChange={(v) => set({ surf: v ? DEFAULT_KEYS : [] })}>{t("All", "전체")}</Toggle>
         <div className={grid2}>
           {surfaces.map(([k, label, c]) => (
             <span key={k} className="flex min-w-0 items-center gap-1">

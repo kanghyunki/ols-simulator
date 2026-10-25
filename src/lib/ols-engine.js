@@ -22,6 +22,7 @@ export const OFZ_SURFACES = [
 ];
 const COLOR = Object.fromEntries([...SURFACES, ...OFZ_SURFACES].map(([k, , c]) => [k, c]));
 export const ALL_KEYS = [...SURFACES, ...OFZ_SURFACES].map(([k]) => k);
+export const DEFAULT_KEYS = ALL_KEYS.filter(k => k !== 'takeoff');   // the take-off climb surface starts off (it is rarely the governing one)
 
 // ---------- Annex 14 Vol.I Tab.4-1/4-2 dimensions by code number (half-widths in m) ----------
 const OLSP = {
@@ -57,7 +58,7 @@ export function createEngine(canvas, cb) {
   // par: added parallel runways [{ ri, off, len }] — a copy of runway `ri` shifted `off` m to its left (A→B; negative = right),
   // centred on the reference, `len` m long (default: the reference length), same threshold elevations
   const state = { showEx: false, extA: [], extB: [], par: [], E: 39, base: 'sat', pen: true, obs: true, ofz: false, proc: [], bldH: 6,
-    surf: new Set(ALL_KEYS), rot: true, zex: 5, noise: false, noiseCfg: null };   // noiseCfg: overrides of NOISE_TRAFFIC (annual, north, evening, night)   // zex: vertical exaggeration, 5× by default so relief and the surfaces' slopes read at airport scale
+    surf: new Set(DEFAULT_KEYS), rot: true, zex: 5, noise: false, noiseCfg: null };   // noiseCfg: overrides of NOISE_TRAFFIC (annual, north, evening, night)   // zex: vertical exaggeration, 5× by default so relief and the surfaces' slopes read at airport scale
 
   // ---------- coordinates / geometry core (per-runway frames) ----------
   function initAp(ap) { if (!ap._k) { const lat0 = ap.osm.origin[0]; ap._k = [111320 * Math.cos(lat0 * Math.PI / 180), 110574]; }
