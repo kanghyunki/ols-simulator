@@ -56,7 +56,7 @@ export function createEngine(canvas, cb) {
   let AP = null, APID = null;
   // extA/extB: extension (m) per runway at the A / B end; showEx overlays the existing OLS for comparison
   // par: added parallel runways [{ ri, off, len }] — a copy of runway `ri` shifted `off` m to its left (A→B; negative = right),
-  // centred on the reference, `len` m long (default: the reference length), same threshold elevations
+  // centred on the reference (`shift` m along A→B moves that centre), `len` m long (default: the reference length), same threshold elevations
   const state = { showEx: false, extA: [], extB: [], par: [], E: 39, base: 'sat', pen: true, obs: true, ofz: false, proc: [], bldH: 6,
     surf: new Set(DEFAULT_KEYS), rot: true, zex: 5, noise: false, noiseCfg: null };   // noiseCfg: overrides of NOISE_TRAFFIC (annual, north, evening, night)   // zex: vertical exaggeration, 5× by default so relief and the surfaces' slopes read at airport scale
 
@@ -67,13 +67,13 @@ export function createEngine(canvas, cb) {
   // Effective scenario: nothing extended → 'ex'; extended → 'ext', or 'cmp' when the existing OLS is overlaid
   const anyExt = () => state.extA.some(v => v > 0) || state.extB.some(v => v > 0) || state.par.length > 0;
   const scen = () => !anyExt() ? 'ex' : state.showEx ? 'cmp' : 'ext';
-  const parKey = () => state.par.map(p => p.ri + ':' + p.off + ':' + (p.len || 0)).join(',');
+  const parKey = () => state.par.map(p => p.ri + ':' + p.off + ':' + (p.len || 0) + ':' + (p.shift || 0) + ':' + (p.on === false ? 0 : 1)).join(',');
   function frames(apply) {
     const base = baseFrames(apply); if (!apply) return base;
     return base.concat(state.par.map((p, k) => { const r = base[p.ri]; if (!r) return null;
-      const L = p.len > 0 ? p.len : r.L, h = L / 2, mx = (r.A[0] + r.B[0]) / 2 + r.N[0] * p.off, my = (r.A[1] + r.B[1]) / 2 + r.N[1] * p.off;
+      const L = p.len > 0 ? p.len : r.L, h = L / 2, sh = p.shift || 0, mx = (r.A[0] + r.B[0]) / 2 + r.N[0] * p.off + r.U[0] * sh, my = (r.A[1] + r.B[1]) / 2 + r.N[1] * p.off + r.U[1] * sh;
       const A = [mx - r.U[0] * h, my - r.U[1] * h], B = [mx + r.U[0] * h, my + r.U[1] * h];
-      return { ...r, A, B, L, baseA: A, baseB: B, baseL: L, nameA: r.nameA + '′', nameB: r.nameB + '′', par: true, i: base.length + k }; }).filter(Boolean));
+      return { ...r, A, B, L, baseA: A, baseB: B, baseL: L, nameA: r.nameA + '′', nameB: r.nameB + '′', par: true, on: p.on !== false, i: base.length + k }; }).filter(Boolean));
   }
   function baseFrames(apply) {
     return AP.rwys.map((r, i) => {
@@ -247,6 +247,7 @@ export function createEngine(canvas, cb) {
     return { apId: APID, loading: !!ap && !ap.osm && !ap._failed, failed: !!ap && !!ap._failed, pending: texPending,
       ap: AP ? { procs: (PROCEDURES[APID] || []).map(p => ({ id: p.id, name: p.name, color: p.color, rwy: p.rwy, ops: p.ops || null })), name: AP.name, sub: AP.sub, E: AP.E, code: AP.code || 4, origin: AP.osm.origin, ext: AP.ext || null, assume: AP.assume,
         rwys: AP.rwys.map((r, i) => ({ id: r.id, len: r.len, on: AP._on[i], nameA: r.nameA, nameB: r.nameB })),
+        pars: state.par.map((p, k) => { const r = AP.rwys[p.ri]; return { id: '∥ ' + r.id, len: p.len || r.len, on: p.on !== false, i: AP.rwys.length + k }; }),   // added parallel runways, toggled through setRunway(i)
         dem: AP.dem ? 'ok' : AP._demLoading ? 'loading' : AP._demFailed ? 'failed' : 'none', demSrc: AP.dem && AP.dem.src } : null,
       state: { ...state, surf: [...state.surf], extA: [...state.extA], extB: [...state.extB], par: state.par.map(p => ({ ...p })), scen: scen() },
       noise: noiseInfo() };
@@ -568,12 +569,12 @@ export function createEngine(canvas, cb) {
       fleet: c ? c.fleet.map(([id, sh]) => [ANP[id].label, sh]) : null }; }
   function noiseTracks(c) {
     const rws = frames(scen() !== 'ex'), procs = PROCEDURES[APID] || [], perDay = c.annual / 365, wN = (1 - c.evening - c.night) + c.evening * 3.1623 + c.night * 10;
-    const roleOf = (rw) => { const o = new Set(procs.filter(p => p.rwy === rw.nameA.replace('′', '') || p.rwy === rw.nameB.replace('′', '')).map(p => p.ops).filter(Boolean)); return o.size === 1 ? [...o][0] : 'both'; };
+    const roleOf = (rw) => { const o = new Set(procs.filter(p => p.rwy === rw.nameA.replace('′', '') || p.rwy === rw.nameB.replace('′', '')).map(p => p.ops).filter(Boolean)); return !rw.par && o.size === 1 ? [...o][0] : 'both'; };
     const on = rws.filter(r => r.on), arrR = on.filter(r => roleOf(r) !== 'dep'), depR = on.filter(r => roleOf(r) !== 'arr'), T = [];
     const north = (rw, atA) => { const u = atA ? rw.U : [-rw.U[0], -rw.U[1]]; return u[1] > 0; };   // heading roughly north (33/34)
     for (const [list, mode] of [[arrR, 'A'], [depR, 'D']]) for (const rw of list) for (const atA of [true, false]) {
       const u = atA ? rw.U : [-rw.U[0], -rw.U[1]], P0 = atA ? rw.A : rw.B, share = north(rw, atA) ? c.north : 1 - c.north;
-      const wt = (r) => (c.rwyShare && AP.rwys[r.i] ? c.rwyShare[AP.rwys[r.i].id] ?? 0 : 1), tot = list.reduce((a, r) => a + wt(r), 0) || 1;
+      const wt = (r) => (c.rwyShare ? c.rwyShare[AP.rwys[r.i] ? AP.rwys[r.i].id : 'par' + (r.i - AP.rwys.length)] ?? 0 : 1), tot = list.reduce((a, r) => a + wt(r), 0) || 1;
       const n = perDay / 2 * wt(rw) / tot * share * wN; if (!n) continue;
       const o = mode === 'A' ? [P0[0] + u[0] * 291, P0[1] + u[1] * 291] : P0;
       T.push({ x: o[0], y: o[1], ux: u[0], uy: u[1], mode, n }); }
@@ -597,7 +598,7 @@ export function createEngine(canvas, cb) {
     const c = nzCv.getContext('2d'), img = c.createImageData(W, H), d = img.data, rgb = B.map(b => [1, 3, 5].map(k => parseInt(b[3].slice(k, k + 2), 16)));
     const band = new Int8Array(W * H).fill(-1);
     for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const v = lnAt(g, ex.x1 + (ex.x2 - ex.x1) * (i + .5) / W, ex.y2 - (ex.y2 - ex.y1) * (j + .5) / H);
-      let b = -1; for (let k = B.length - 1; k >= 0; k--) if (v >= B[k][0]) { b = k; break; } band[j * W + i] = b; }
+      let b = -1; for (let k = B.length - 1; k >= 0; k--) if (v >= B[k][0]) { b = k; break; } if (b < (state.noiseFrom || 0)) b = -1; band[j * W + i] = b; }   // noiseFrom: lowest band index drawn (inner bands first)
     for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) { const k = j * W + i, b = band[k]; if (b < 0) continue;
       const edge = (i && band[k - 1] !== b) || (j && band[k - W] !== b) || (i < W - 1 && band[k + 1] !== b) || (j < H - 1 && band[k + W] !== b);
       const [r, gg, bb] = rgb[b], q = k * 4; d[q] = r; d[q + 1] = gg; d[q + 2] = bb; d[q + 3] = edge ? 235 : 110; }
@@ -644,8 +645,9 @@ export function createEngine(canvas, cb) {
   // ---------- public API ----------
   function set(patch) {
     for (const [k, v] of Object.entries(patch)) { if (k === 'surf') state.surf = new Set(v); else if (k === 'extA' || k === 'extB') state[k] = [...v];
-      else if (k === 'par') state.par = v.map(p => ({ ri: p.ri, off: +p.off || 0, len: Math.max(0, +p.len || 0) })).filter(p => AP && AP.rwys[p.ri]); else state[k] = v; }
+      else if (k === 'par') state.par = v.map(p => ({ ri: p.ri, off: +p.off || 0, len: Math.max(0, +p.len || 0), shift: +p.shift || 0, on: p.on !== false })).filter(p => AP && AP.rwys[p.ri]); else state[k] = v; }
     if ('rot' in patch) ctl.autoRotate = !!patch.rot;
+    if ('noiseFrom' in patch && NZ.grid) drawNoise();
     if ('zex' in patch) { const dy = state.E * (+patch.zex - G.scale.y); G.scale.y = +patch.zex; ctl.target.y += dy; camera.position.y += dy; }   // keep the view: camera rides up with the aerodrome
     sync(); emit(); }
   // Summary for reports: terrain above the combined OLS on a 60 m grid (km², max), and the buildings through it
@@ -659,12 +661,12 @@ export function createEngine(canvas, cb) {
       .map(o => ({ name: o.b.n || null, tag: bTag(o.b), h: o.h, top: +o.top.toFixed(1), limit: +o.r.h.toFixed(1), surface: o.r.name, pen: +o.pen.toFixed(1) }));
     return { apId: APID, dem: AP.dem ? AP.dem.src : null, area: +(n * 0.0036).toFixed(2), worst, bySurface: by, obsChecked: L.obsList.length, obsBad: bad }; }
   function setExt(i, end, len) { if (!AP) return; (end === 'A' ? state.extA : state.extB)[i] = Math.max(0, +len || 0); sync(); emit(); }
-  function setRunway(i, on) { if (!AP) return; AP._on[i] = on; sync(); emit(); }
+  function setRunway(i, on) { if (!AP) return; if (i < AP.rwys.length) AP._on[i] = on; else if (state.par[i - AP.rwys.length]) state.par[i - AP.rwys.length].on = on; sync(); emit(); }   // i past the airport's runways = an added parallel runway
   function destroy() { alive = false; canvas.removeEventListener('pointermove', onMove); ctl.dispose(); renderer.dispose(); }
 
   resize(); loop();
   // console probes for terrain checks: __ols.probe.dem(x, y), __ols.probe.ols(x, y), __ols.probe.xy(lat, lon), __ols.probe.cam(x, y, h, tx, ty)
-  const probe = { noiseEdge: () => noiseEdge(), dem: (x, y) => demAt(x, y), ols: (x, y) => ols([x, y], frames(true)), xy: (lat, lon) => LL(AP, [lat, lon]), cam: (x, y, h, tx, ty) => { state.rot = false; camera.position.set(x, h, -y); ctl.target.set(tx, 0, -ty); ctl.update(); }, rws: () => frames(false).map(f => ({ A: f.A, B: f.B, eA: f.eA, eB: f.eB })), demInfo: () => AP.dem && { src: AP.dem.src, dx: AP.dem.dx, dy: AP.dem.dy, nx: AP.dem.nx, ny: AP.dem.ny } };
+  const probe = { noiseEdge: () => noiseEdge(), noiseGrid: () => NZ.grid, dem: (x, y) => demAt(x, y), ols: (x, y) => ols([x, y], frames(true)), xy: (lat, lon) => LL(AP, [lat, lon]), cam: (x, y, h, tx, ty) => { state.rot = false; camera.position.set(x, h, -y); ctl.target.set(tx, 0, -ty); ctl.update(); }, rws: () => frames(false).map(f => ({ A: f.A, B: f.B, eA: f.eA, eB: f.eB })), demInfo: () => AP.dem && { src: AP.dem.src, dx: AP.dem.dx, dy: AP.dem.dy, nx: AP.dem.nx, ny: AP.dem.ny } };
   const noiseEdge = () => { const g = NZ.grid; if (!g) return null; let m = -1e9; for (let i = 0; i < g.nx; i++) m = Math.max(m, g.L[i], g.L[(g.ny - 1) * g.nx + i]); for (let j = 0; j < g.ny; j++) m = Math.max(m, g.L[j * g.nx], g.L[j * g.nx + g.nx - 1]); return +m.toFixed(1); };
   const debug = () => ({ hi: { on: hiU.hiOn.value, rect: hiU.hiRect.value.toArray().map(Math.round), w: hiCv.width, h: hiCv.height, img: hiCv.width ? hiCv.toDataURL('image/jpeg', .4) : null, mat: !!L.ground?.material.onBeforeCompile }, planes: planes.map(p => ({ T: p.seq.map(q => Math.round(q.tr.T)), gap: p.seq.map(q => +q.gap.toFixed(1)), pool: p.pool.length, live: p.live, pos: p.pool.filter(o => o.visible).map(o => o.position.toArray().map(Math.round)) })), pending: texPending, K: { ...K }, texW: texCv.width, texH: texCv.height, hsW: hsCv.width, tex: texCv.toDataURL('image/jpeg', .5), hs: hsCv.width ? hsCv.toDataURL('image/jpeg', .5) : null });
   return { switchAirport, set, setExt, setRunway, fit, resize, destroy, snapshot, stats, debug, probe };
