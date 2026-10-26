@@ -185,6 +185,51 @@ export const PROCEDURES = {
         ['OPONO', dms(35, 18, 24.2), dms(128, 43, 46.2), 5000], ['GAYHA', dms(35, 13, 22.4), dms(128, 37, 54.4), 6000], ['KEVOX', KEVOX, KEVOX_E, 6000]] },
     ] },
   ],
+  // AIP Ireland EIDW AD 2.24-27/30/33/36/39 (+ .2 coded tables), ILS CAT I/II or LOC RWY 28L/28R/10L/10R, ILS CAT I RWY 16,
+  // AIRAC 2026-05-14. West longitudes negative. FAF altitude = the 3° path at the FAF (THR + 50 ft), rounded to 100 ft;
+  // missed-approach fixes without a published altitude take the 2.5 % climb. 10L/28R THR = the displaced thresholds.
+  EIDW: [
+    { id: 'ILS28L', rwy: '28L', name: 'ILS RWY 28L', color: 0x3ddc84, paths: [
+      { legs: [['DUB', dms(53, 29, 57.8), -dms(6, 18, 25.6), 3000], ['DW017', dms(53, 30, 39.7), -dms(5, 55, 38.6), 3000], ['LAPMO', dms(53, 24, 11.0), -dms(5, 56, 44.1), 3000],
+        ['MAXEV', dms(53, 24, 33.5), -dms(6, 3, 17.3), 2500], ['THR 28L', dms(53, 25, 12.94), -dms(6, 15, 2.08), 252]] },
+      { legs: [['PIZSA', dms(53, 28, 44.3), -dms(5, 48, 33.6), 3000], ['LAPMO', dms(53, 24, 11.0), -dms(5, 56, 44.1), 3000]] },
+      { legs: [['OBINU', dms(53, 20, 1.7), -dms(5, 49, 31.2), 3000], ['LAPMO', dms(53, 24, 11.0), -dms(5, 56, 44.1), 3000]] },
+      // straight ahead to GANET, turn right DW034, DUB, 3 000 ft
+      { ma: true, legs: [['THR 28L', dms(53, 25, 12.94), -dms(6, 15, 2.08), 252], ['GANET', dms(53, 26, 6.5), -dms(6, 31, 33.8), 3000],
+        ['DW034', dms(53, 30, 37.4), -dms(6, 33, 42.6), 3000], ['DUB', dms(53, 29, 57.8), -dms(6, 18, 25.6), 3000]] },
+    ] },
+    { id: 'ILS28R', rwy: '28R', name: 'ILS RWY 28R', color: 0x38bdf8, paths: [
+      { legs: [['SIDUQ', dms(53, 31, 42.4), -dms(6, 7, 3.6), 3000], ['DW017', dms(53, 30, 39.7), -dms(5, 55, 38.6), 3000], ['ABIVU', dms(53, 25, 5.7), -dms(5, 56, 31.5), 3000],
+        ['OKEDO', dms(53, 25, 28.2), -dms(6, 3, 14.0), 2500], ['THR 28R', dms(53, 26, 6.73), -dms(6, 14, 41.87), 263]] },
+      { legs: [['OBINU', dms(53, 20, 1.7), -dms(5, 49, 31.2), 3000], ['ABIVU', dms(53, 25, 5.7), -dms(5, 56, 31.5), 3000]] },
+      // straight ahead DW040, turn right DW041, DW042, SIDUQ, 3 000 ft
+      { ma: true, legs: [['THR 28R', dms(53, 26, 6.73), -dms(6, 14, 41.87), 263], ['DW040', dms(53, 26, 23.8), -dms(6, 19, 44.4), 700],
+        ['DW041', dms(53, 30, 11.9), -dms(6, 27, 12.8), 3000], ['DW042', dms(53, 32, 44.1), -dms(6, 18, 29.1), 3000], ['SIDUQ', dms(53, 31, 42.4), -dms(6, 7, 3.6), 3000]] },
+    ] },
+    { id: 'ILS10R', rwy: '10R', name: 'ILS RWY 10R', color: 0xf59e0b, paths: [
+      { legs: [['OSLEX', dms(53, 21, 55.8), -dms(6, 41, 44.5), 5000], ['RAQAR', dms(53, 26, 36.1), -dms(6, 41, 1.2), 4000],
+        ['GANET', dms(53, 26, 6.5), -dms(6, 31, 33.8), 3000], ['THR 10R', dms(53, 25, 20.75), -dms(6, 17, 24.27), 293]] },
+      { legs: [['IFBAP', dms(53, 32, 30.8), -dms(6, 40, 6.2), 4000], ['RAQAR', dms(53, 26, 36.1), -dms(6, 41, 1.2), 4000]] },
+      // straight ahead to DW031 (D9.76 IDE), turn right direct UMOWI, 4 000 ft
+      { ma: true, legs: [['THR 10R', dms(53, 25, 20.75), -dms(6, 17, 24.27), 293], ['DW031', dms(53, 24, 25.9), -dms(6, 0, 29.2), 2000],
+        ['UMOWI', dms(53, 20, 2.9), -dms(6, 8, 59.1), 4000]] },
+    ] },
+    { id: 'ILS10L', rwy: '10L', name: 'ILS RWY 10L', color: 0xa78bfa, paths: [
+      { legs: [['IFBAP', dms(53, 32, 30.8), -dms(6, 40, 6.2), 4000], ['SUBOF', dms(53, 27, 32.5), -dms(6, 40, 52.5), 4000],
+        ['EBEZA', dms(53, 27, 0.2), -dms(6, 31, 2.2), 3000], ['THR 10L', dms(53, 26, 13.79), -dms(6, 16, 50.22), 285]] },
+      { legs: [['OSLEX', dms(53, 21, 55.8), -dms(6, 41, 44.5), 5000], ['SUBOF', dms(53, 27, 32.5), -dms(6, 40, 52.5), 4000]] },
+      // straight ahead to DW906, turn left DW907 (3 000 ft), DW908, BATAF 4 000 ft
+      { ma: true, legs: [['THR 10L', dms(53, 26, 13.79), -dms(6, 16, 50.22), 285], ['DW906', dms(53, 26, 5.4), -dms(6, 14, 17.6), 500],
+        ['DW907', dms(53, 28, 40.1), -dms(6, 4, 53.0), 3000], ['DW908', dms(53, 32, 44.8), -dms(6, 12, 35.1), 3000], ['BATAF', dms(53, 32, 36.0), -dms(6, 23, 20.5), 4000]] },
+    ] },
+    { id: 'ILS16', rwy: '16', name: 'ILS RWY 16', color: 0xf472b6, paths: [
+      { legs: [['ULTAG', dms(53, 42, 1.0), -dms(6, 44, 17.2), 6000], ['UMDAR', dms(53, 38, 3.3), -dms(6, 31, 35.5), 3000], ['BAPDA', dms(53, 37, 40.0), -dms(6, 24, 3.7), 3000],
+        ['GARTI', dms(53, 34, 12.8), -dms(6, 21, 32.1), 3000], ['THR 16', dms(53, 26, 13.16), -dms(6, 15, 43.12), 268]] },
+      { legs: [['KERAV', dms(53, 37, 42.7), -dms(5, 45, 57.3), 6000], ['ERUDA', dms(53, 40, 29.0), -dms(6, 16, 55.0), 3000], ['BAPDA', dms(53, 37, 40.0), -dms(6, 24, 3.7), 3000]] },
+      // straight ahead to DW007 (MATP), climbing to 5 000 ft
+      { ma: true, legs: [['THR 16', dms(53, 26, 13.16), -dms(6, 15, 43.12), 268], ['DW007', dms(53, 20, 3.5), -dms(6, 11, 15.7), 1200]] },
+    ] },
+  ],
 };
 
 // Source line shown under Flight procedures, per airport
@@ -193,4 +238,5 @@ export const PROC_NOTES = {
   RKSS: 'AIP RKSS AD 2-29/30/32/34/37, ILS RWY 14L/14R/32L/32R (AMDT 13/25, 2/26).',
   RKPC: 'AIP RKPC AD 2-21/22/26/27, ILS RWY 07/25 (AMDT 5/26).',
   RKPK: 'AIP RKPK AD 2-21, ILS X RWY 36L (AMDT 11/26).',
+  EIDW: 'AIP Ireland EIDW AD 2.24-27/30/33/36/39, ILS RWY 28L/28R/10L/10R/16 (AIRAC 2026-05-14).',
 };
