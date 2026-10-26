@@ -403,6 +403,27 @@ const AIRPORTS={
       +'· 지형: <b>GEDTM30</b>(OpenLandMap 2025, 30m 지면고 DTM, CC BY 4.0) 내장 — 수목·건물을 제거한 지면고 — 창이는 해안 매립지로 평탄, 저촉은 주로 서측 내륙 구릉·건물. 건물은 OSM height/levels 태그 중 h≥20m만 수록(1,769동, IH 51.7m 기준 20m 미만은 저촉 불가).<br>'
       +'· 전 활주로 정밀(CAT II/III) → OLS 제원은 Tab.4-1 Code 4, OFZ 옵션(AD 2.12 OFZ 존재 명기).'
   },
+  EIDW:{
+    name:'더블린', sub:'EIDW · Dublin Intl · Ireland', region:'EUR', E:74.1,
+    osm:null, dem:null, demFile:{url:"dem/EIDW.bin",x0:-18532.43,y0:-18279.58,dx:30,dy:30,nx:1215,ny:1165,s:0.1,zmax:215,src:"GEDTM30 (OpenLandMap, CC BY 4.0), bare-earth DTM, EGM2008"},
+    rwys:[ // THR 좌표·표고: AIP Ireland EIDW AD 2.12 (AIRAC 2026-05-14). 10L/28R는 이설시단 → 활주로 끝(10L −280m, 28R +450m)으로 환산
+      {id:'10R/28L', nameA:'10R', nameB:'28L', len:2637,
+       llA:[53+25/60+20.75/3600, -(6+17/60+24.27/3600)], llB:[53+25/60+12.94/3600, -(6+15/60+ 2.08/3600)],
+       eA:74.1, eB:61.9, cwyA:213, cwyB:213},
+      {id:'10L/28R', nameA:'10L', nameB:'28R', len:3109,
+       llA:[53+26/60+14.62/3600, -(6+17/60+ 5.35/3600)], llB:[53+26/60+ 5.39/3600, -(6+14/60+17.55/3600)],
+       eA:71.6, eB:64.9, cwyA:60, cwyB:60},
+      {id:'16/34', nameA:'16', nameB:'34', len:2072,
+       llA:[53+26/60+13.16/3600, -(6+15/60+43.12/3600)], llB:[53+25/60+11.66/3600, -(6+14/60+58.54/3600)],
+       eA:66.4, eB:61.6, cwyA:183, cwyB:61}
+    ],
+    bgRwy:[], ext:null, fitAll:13000, fitRwy:3600,
+    assume:'· 시단 좌표·표고(10R 74.1/28L 61.9m, 10L 71.6/28R 64.9m, 16 66.4/34 61.6m), AD 표고 74.1m(243ft), 활주로 10R/28L 2637×45m, 10L/28R 3109×45m, 16/34 2072×45m: <b>AIP Ireland EIDW AD 2.2/2.12 (AIRAC 2026-05-14)</b>.<br>'
+      +'· <b>10L/28R 이설시단</b>(10L 280m, 28R 450m): AIP 좌표는 이설시단이라 활주로 끝으로 환산해 넣음 — 접근표면 원점이 실제(이설시단+60m)보다 바깥에 놓여 보수측. 끝단 표고는 시단 표고로 가정.<br>'
+      +'· CWY는 AD 2.13 TODA−TORA(10R·28L 213, 10L·28R 60, 16 183, 34 61m). 구 11/29 활주로는 폐쇄(유도로 전환)라 미수록.<br>'
+      +'· 지형: <b>GEDTM30</b>(OpenLandMap 2025, 30m 지면고 DTM, CC BY 4.0). 건물은 OSM height/levels 태그 중 h≥20m만 수록, 철탑·마스트는 태그 없으면 종류별 가정 높이.<br>'
+      +'· 전 활주로 Code 4 계기활주로로 보고 Tab.4-1 제원 적용.'
+  },
   FQMA:{
     name:'마푸토', sub:'FQMA · Maputo Intl · Mozambique', region:'AFR', E:44.8, code:4,
     osm:null, dem:null, demFile:{url:"dem/FQMA.bin",x0:-17381.06,y0:-18091.79,dx:30,dy:30,nx:1159,ny:1207,s:0.1,zmax:79,src:"GEDTM30 (OpenLandMap, CC BY 4.0), bare-earth DTM, EGM2008"},
