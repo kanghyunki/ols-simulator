@@ -404,7 +404,7 @@ const AIRPORTS={
       +'· 전 활주로 정밀(CAT II/III) → OLS 제원은 Tab.4-1 Code 4, OFZ 옵션(AD 2.12 OFZ 존재 명기).'
   },
   EIDW:{
-    name:'더블린', sub:'EIDW · Dublin Intl · Ireland', region:'EUR', E:74.1,
+    name:'더블린', sub:'EIDW · Dublin Intl · Ireland', region:'EUR', E:74.1, osmV:2,
     osm:null, dem:null, demFile:{url:"dem/EIDW.bin",x0:-18532.43,y0:-18279.58,dx:30,dy:30,nx:1215,ny:1165,s:0.1,zmax:215,src:"GEDTM30 (OpenLandMap, CC BY 4.0), bare-earth DTM, EGM2008"},
     rwys:[ // THR 좌표·표고: AIP Ireland EIDW AD 2.12 (AIRAC 2026-05-14). 10L/28R는 이설시단 → 활주로 끝(10L −280m, 28R +450m)으로 환산
       {id:'10R/28L', nameA:'10R', nameB:'28L', len:2637,

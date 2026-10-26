@@ -218,9 +218,9 @@ export function createEngine(canvas, cb) {
   const bTag = b => (b.t ? TAG[b.t] || b.t : 'Building') + ((b.est || !b.h) ? ' (assumed height)' : '');
 
   // ---------- airport data ----------
-  function loadOsm(id) {
+  function loadOsm(id) {   // osmV: bump when an airport's data file changes (files are cached a day, like dem/)
     return _osmP[id] || (_osmP[id] = new Promise((res, rej) => {
-      const s = document.createElement('script'); s.src = `/data/osm_${id}.js`;
+      const s = document.createElement('script'); s.src = `/data/osm_${id}.js` + (AIRPORTS[id]?.osmV ? '?v=' + AIRPORTS[id].osmV : '');
       s.onload = () => { // the data files declare top-level consts; hand them over through window
         const t = document.createElement('script');
         t.text = `window.__olsOsm=OSM_${id}; window.__olsDem=(typeof DEM_${id}!=='undefined')?DEM_${id}:null;`;

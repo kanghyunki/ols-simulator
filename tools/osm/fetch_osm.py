@@ -1,5 +1,5 @@
 # OSM (Overpass) -> simulator data public/data/osm_<ICAO>.js + meta_<ICAO>.json. From CADIP_Web tools/ols/fetch_osm.py
-#   python fetch_osm.py AYGA AYWK ...     (인자 없으면 PNG 13개 전부)
+#   python tools/osm/fetch_osm.py EIDW --urban     |  --prune EIDW: drop assumed-height masts inside the aerodrome of an existing file
 # ENU 투영은 시뮬레이터 initAp 과 동일: x=(lon-lon0)*111320*cos(lat0), y=(lat-lat0)*110574
 import sys, json, math, time, re, urllib.request, urllib.parse, pathlib
 import numpy as np
@@ -33,6 +33,33 @@ def num(v):
     x = float(m.group(1)); return round(x * 0.3048, 1) if m.group(2) else x
 
 URBAN=False   # --urban: 도심 공항(서울·부산권) — 건물은 높이≥20m 또는 6층 이상만, 도로는 간선만 (Overpass 용량·파일 크기)
+
+def aerodrome_edges(icao):
+    """Boundary segments [(lat, lon), (lat, lon)] of the aerodrome way or relation (outer members), for an even-odd test."""
+    E = []
+    for e in overpass(f'[out:json][timeout:120];nwr["aeroway"="aerodrome"]["icao"="{icao}"];out geom;')['elements']:
+        rings = [e['geometry']] if 'geometry' in e else [m['geometry'] for m in e.get('members', []) if m.get('role') in ('outer', '') and 'geometry' in m]
+        for g in rings: E += [((p['lat'], p['lon']), (q['lat'], q['lon'])) for p, q in zip(g, g[1:])]
+    return E
+
+def inside(E, lat, lon):
+    c = False
+    for (ay, ax), (by, bx) in E:
+        if (ay > lat) != (by > lat) and lon < (bx - ax) * (lat - ay) / (by - ay) + ax: c = not c
+    return c
+
+def prune(icao, o=None):
+    """Point obstacles inside the aerodrome with an assumed height (est) are the airport's own ILS/beacon/lighting masts,
+    sited and frangible by rule — 25–30 m guesses there only make false penetrations, so they are dropped."""
+    path = OUT / f'osm_{icao}.js'; save = o is None
+    if save: s = path.read_text(encoding='utf-8'); o = json.loads(s[s.index('=') + 1:].rstrip().rstrip(';'))
+    E = aerodrome_edges(icao)
+    if not E: print('  no aerodrome outline, nothing pruned'); return o
+    lat0, lon0 = o['origin']; kx, ky = 111320 * math.cos(math.radians(lat0)), 110574
+    keep = [b for b in o['bld'] if not (b.get('est') and inside(E, lat0 + b['p'][0][1] / ky, lon0 + b['p'][0][0] / kx))]
+    print(f'  pruned {len(o["bld"]) - len(keep)} assumed-height points inside the aerodrome'); o['bld'] = keep
+    if save: path.write_text(f'const OSM_{icao}=' + json.dumps(o, separators=(',', ':')) + ';\n', encoding='utf-8')
+    return o
 
 def run(icao, force=False):
     print('==', icao)
@@ -84,7 +111,7 @@ out geom;''')['elements']
             c = e.get('center') or e
             if 'lat' not in c: continue
             pt = xy({'lat': c['lat'], 'lon': c['lon']})
-            h = num(tg.get('height')); est = h is None; h = h if h else TOWER_H[kind]
+            h = None if 'height' in (tg.get('fixme') or '').lower() else num(tg.get('height')); est = h is None; h = h if h else TOWER_H[kind]
             o['bld'].append({'p': [pt], 'h': h, 'n': tg.get('name') or tg.get('operator'), 't': kind, 'est': est}); continue
         if not g: continue
         pts = [xy(n) for n in g]; aw = tg.get('aeroway')
@@ -120,12 +147,15 @@ out geom;''')['elements']
             o['rwy'][nk] = o['rwy'].pop(k); k = nk
         meta['rwys'].append({'ref': k, 'nameA': names[0], 'nameB': names[1], 'llA': A, 'llB': B, 'L_osm': g['L'],
                              'len_tag': num(g['len']), 'w_tag': num(g['w']), 'surface': g['surf'], 'bearingAB': round(brg, 1)})
-    OUT.mkdir(exist_ok=True)
+    OUT.mkdir(exist_ok=True); prune(icao, o)
     (OUT / f'osm_{icao}.js').write_text(f'const OSM_{icao}=' + json.dumps(o, separators=(',', ':')) + ';\n', encoding='utf-8')
     (OUT / f'meta_{icao}.json').write_text(json.dumps(meta, indent=1, ensure_ascii=False), encoding='utf-8')
     print(f"  {t.get('name')} | rwy {[(m['ref'], m['nameA'], m['nameB'], m['L_osm']) for m in meta['rwys']]} | bld {len(o['bld'])} (h: {sum(1 for b in o['bld'] if b['h'] and not b.get('t'))}, towers: {sum(1 for b in o['bld'] if b.get('t'))}) twy {len(o['twy'])} road {len(o['road'])}")
 
 if __name__ == '__main__':
+    if '--prune' in sys.argv:   # re-apply prune() to existing files without refetching
+        for ic in [a for a in sys.argv[1:] if not a.startswith('--')]: prune(ic)
+        raise SystemExit
     force = '--force' in sys.argv; URBAN = '--urban' in sys.argv; ids = [a for a in sys.argv[1:] if not a.startswith('--')] or PNG
     for i, ic in enumerate(ids):
         if i: time.sleep(25)   # Overpass rate limit (429)
