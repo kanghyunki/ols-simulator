@@ -5,7 +5,7 @@ import { SiteNav } from "@/components/site-nav";
 import { supabase } from "@/lib/supabase";
 import { useT } from "@/lib/lang";
 
-// Forgotten password, in three steps: the account's email → the 6-digit code from the recovery email (the Supabase
+// Forgotten password, in three steps: the account's email → the 6–8 digit code (the project's Email OTP Length) from the recovery email (the Supabase
 // "Reset password" template shows {{ .Token }}) → a new password, after which the member is signed in.
 // Supabase answers the first step the same way whether or not the email has an account, so nothing is revealed here.
 const field = "h-12 w-full rounded-md border border-white/12 bg-white/[.04] px-4 text-[16px] text-white placeholder:text-white/35 outline-none transition focus:border-[#4f7dff] focus:bg-white/[.06]";
@@ -31,7 +31,7 @@ export default function Reset() {
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${location.origin}/reset` });
     setBusy(false);
     if (error) return fail(error, ["We could not send the email. Please try again later.", "메일을 보내지 못했습니다. 잠시 후 다시 시도해 주세요."]);
-    setStep("code"); setCode(""); setMsg({ ok: true, text: t("If this email has an account, a 6-digit code is on its way. Check your inbox (and spam).", "가입된 이메일이면 6자리 인증번호를 보냈습니다. 받은편지함(스팸함 포함)을 확인해 주세요.") });
+    setStep("code"); setCode(""); setMsg({ ok: true, text: t("If this email has an account, a code is on its way. Check your inbox (and spam).", "가입된 이메일이면 인증번호를 보냈습니다. 받은편지함(스팸함 포함)을 확인해 주세요.") });
   };
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); if (busy) return;
@@ -48,7 +48,7 @@ export default function Reset() {
     if (error) return fail(error, ["We could not change the password. Please try again.", "비밀번호를 바꾸지 못했습니다. 다시 시도해 주세요."]);
     setStep("done");
   };
-  const ready = step === "email" ? okEmail : step === "code" ? /^\d{6}$/.test(code) : pw.length >= 8 && pw === pw2;
+  const ready = step === "email" ? okEmail : step === "code" ? /^\d{6,8}$/.test(code) : pw.length >= 8 && pw === pw2;
 
   return (
     <div className="fixed inset-0 overflow-y-auto bg-[#050608] text-white">
@@ -73,9 +73,9 @@ export default function Reset() {
               <input id="email" type="email" autoComplete="email" autoFocus placeholder={t("Your email address", "이메일 주소")} value={email} onChange={(e) => setEmail(e.target.value)} className={field} />
             </>}
             {step === "code" && <>
-              <label htmlFor="code" className="mb-2 block text-[14px] font-medium text-white/85">{t("6-digit code", "6자리 인증번호")} <span className="font-normal text-white/45">· {email.trim()}</span></label>
-              <input id="code" inputMode="numeric" autoComplete="one-time-code" autoFocus maxLength={6} placeholder="000000" value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} className={`${field} text-center font-mono text-[24px] tracking-[0.5em]`} />
+              <label htmlFor="code" className="mb-2 block text-[14px] font-medium text-white/85">{t("Code from the email", "메일로 받은 인증번호")} <span className="font-normal text-white/45">· {email.trim()}</span></label>
+              <input id="code" inputMode="numeric" autoComplete="one-time-code" autoFocus maxLength={8} placeholder="000000" value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 8))} className={`${field} text-center font-mono text-[24px] tracking-[0.5em]`} />
             </>}
             {step === "password" && <>
               <label htmlFor="pw" className="mb-2 block text-[14px] font-medium text-white/85">{t("New password", "새 비밀번호")}</label>
