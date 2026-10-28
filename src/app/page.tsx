@@ -101,7 +101,7 @@ export default function Page() {
               ))}
             </div>
             <div className="mt-16 flex items-center justify-between border-t border-white/[.07] pt-6 text-[12.5px] text-white/40">
-              <Logo /><span>© 2026 OLS Simulator</span>
+              <Logo /><span><Link href="/privacy" className="mr-5 transition hover:text-white/70">{t("Privacy", "개인정보처리방침")}</Link>© 2026 OLS Simulator</span>
             </div>
           </footer>
         </div>

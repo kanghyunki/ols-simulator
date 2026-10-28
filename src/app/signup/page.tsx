@@ -118,7 +118,7 @@ export default function SignUp() {
           <div className="col-span-2 max-md:col-span-1">
             <label className="flex cursor-pointer items-start gap-3 text-[15px] leading-snug text-white/75">
               <input type="checkbox" required checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 size-5 shrink-0 cursor-pointer accent-[#3f6bff]" />
-              {t("Do you agree to the collection and use of your personal information? *", "개인정보 수집·이용에 동의하십니까? *")}
+              <span>{t("Do you agree to the collection and use of your personal information? *", "개인정보 수집·이용에 동의하십니까? *")} <Link href="/privacy" target="_blank" className="text-[#7d9bff] underline-offset-4 hover:underline">{t("Privacy policy", "개인정보처리방침")}</Link></span>
             </label>
           </div>
           <div className="col-span-2 max-md:col-span-1">
