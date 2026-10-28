@@ -9,6 +9,7 @@ import { PROCEDURES } from '@/data/procedures.js';
 import { NOISE_TRAFFIC, NOISE_BANDS } from '@/data/noise-traffic.js';
 import { ANP } from '@/data/noise-anp.js';
 import { table as noiseTable, lden, lnAt } from '@/lib/noise.js';
+import { buildAircraft, B738 } from '@/lib/plane3d.js';
 
 export { AIRPORTS } from '@/data/airports.js';
 
@@ -58,7 +59,7 @@ export function createEngine(canvas, cb) {
   // par: added parallel runways [{ ri, off, len }] — a copy of runway `ri` shifted `off` m to its left (A→B; negative = right),
   // centred on the reference (`shift` m along A→B moves that centre), `len` m long (default: the reference length), same threshold elevations
   const state = { showEx: false, extA: [], extB: [], par: [], E: 39, base: 'sat', pen: true, obs: true, ofz: false, proc: [], bldH: 6,
-    surf: new Set(DEFAULT_KEYS), rot: true, zex: 5, noise: false, noiseCfg: null };   // noiseCfg: overrides of NOISE_TRAFFIC (annual, north, evening, night)   // zex: vertical exaggeration, 5× by default so relief and the surfaces' slopes read at airport scale
+    surf: new Set(DEFAULT_KEYS), rot: true, zex: 5, noise: false, noise3d: false, noiseBld: false, noiseCfg: null };   // noiseCfg: overrides of NOISE_TRAFFIC (annual, north, evening, night)   // zex: vertical exaggeration, 5× by default so relief and the surfaces' slopes read at airport scale
 
   // ---------- coordinates / geometry core (per-runway frames) ----------
   function initAp(ap) { if (!ap._k) { const lat0 = ap.osm.origin[0]; ap._k = [111320 * Math.cos(lat0 * Math.PI / 180), 110574]; }
@@ -266,7 +267,7 @@ export function createEngine(canvas, cb) {
   scene.add(new THREE.HemisphereLight(0xffffff, 0x2a2d33, 0.75));
   const sun = new THREE.DirectionalLight(0xffffff, 1.1); sun.position.set(-1, 0.6, -1); scene.add(sun);   // low sun from the north-west, like a hillshade
   const G = new THREE.Group(); G.scale.y = state.zex; scene.add(G);          // metres. ENU (x,y,z) → three (x, z, -y). G.scale.y = vertical exaggeration
-  const L = { ground: null, groundEx: null, surf: [], grid: [], obs: null, obsList: [], rwy: [], proc: [] };
+  const L = { ground: null, groundEx: null, surf: [], grid: [], obs: null, nz3: null, obsList: [], rwy: [], proc: [] };
   const K = {};
   let alive = true, texPending = false, syncQueued = false;
   const texCv = document.createElement('canvas'), ovCv = document.createElement('canvas'), hsCv = document.createElement('canvas');
@@ -437,7 +438,8 @@ export function createEngine(canvas, cb) {
         else { geo = new THREE.ExtrudeGeometry(new THREE.Shape(b.p.map(q => new THREE.Vector2(q[0], q[1]))), { depth: h, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, g, 0); }
       } catch (e) { return; }
       const n = geo.attributes.position.count, col = new Float32Array(n * 3), bid = new Float32Array(n).fill(L.obsList.length);
-      tmp.setHex(pen > 0 ? 0xe0443e : 0xb8b2a8); for (let i = 0; i < n; i++) { col[3 * i] = tmp.r; col[3 * i + 1] = tmp.g; col[3 * i + 2] = tmp.b; }
+      const nb = nzOn('noiseBld') ? bandAt(lnAt(NZ.grid, cx, cy)) : -1;   // noise 3D: buildings take their Lden band colour
+      if (nb >= 0) tmp.set(noiseBands()[nb][3]).convertSRGBToLinear(); else tmp.setHex(nzOn('noiseBld') ? 0x6b675f : pen > 0 ? 0xe0443e : 0xb8b2a8); for (let i = 0; i < n; i++) { col[3 * i] = tmp.r; col[3 * i + 1] = tmp.g; col[3 * i + 2] = tmp.b; }
       geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); geo.setAttribute('bid', new THREE.BufferAttribute(bid, 1));
       L.obsList.push({ b, h, g, top, r, pen }); geos.push(geo); });
     if (!geos.length) return;
@@ -470,13 +472,17 @@ export function createEngine(canvas, cb) {
     for (const pr of procs) for (const path of pr.paths) { const mv = procShift(pr);
       const pts = path.legs.map(([, lat, lon, ft], i) => { const P = LL(AP, [lat, lon]), [x, y] = i || path.ma ? mv(P) : P; return new THREE.Vector3(x, ft * 0.3048, -y); });
       const curve = new THREE.CurvePath(); for (let i = 1; i < pts.length; i++) curve.add(new THREE.LineCurve3(pts[i - 1], pts[i]));
-      add(new THREE.Mesh(new THREE.TubeGeometry(curve, 64 * (pts.length - 1), 22, 6, false),
-        new THREE.MeshBasicMaterial({ color: path.ma ? 0xf5a524 : pr.color })));
-      const V = [], D = [], gz = v => Math.max(0, demAt(v.x, -v.z) ?? 0);
+      // a translucent ribbon from the path down to the ground, densest at the path, with a thin bright edge on top
+      const col = new THREE.Color(path.ma ? 0xf5a524 : pr.color);
+      add(new THREE.Mesh(new THREE.TubeGeometry(curve, 64 * (pts.length - 1), 9, 6, false),
+        new THREE.MeshBasicMaterial({ color: col.clone().lerp(new THREE.Color(0xffffff), .35), transparent: true, opacity: .9 })));
+      const V = [], H = [], D = [], gz = v => Math.max(0, demAt(v.x, -v.z) ?? 0);
       for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], ga = gz(a), gb = gz(b);
-        V.push(a.x, a.y, a.z, b.x, b.y, b.z, b.x, gb, b.z, a.x, a.y, a.z, b.x, gb, b.z, a.x, ga, a.z); }
-      const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.Float32BufferAttribute(V, 3));
-      add(new THREE.Mesh(cg, new THREE.MeshBasicMaterial({ color: path.ma ? 0xf5a524 : pr.color, transparent: true, opacity: .12, side: THREE.DoubleSide, depthWrite: false })));
+        V.push(a.x, a.y, a.z, b.x, b.y, b.z, b.x, gb, b.z, a.x, a.y, a.z, b.x, gb, b.z, a.x, ga, a.z); H.push(1, 1, 0, 1, 0, 0); }
+      const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.Float32BufferAttribute(V, 3)); cg.setAttribute('h', new THREE.Float32BufferAttribute(H, 1));
+      add(new THREE.Mesh(cg, new THREE.ShaderMaterial({ transparent: true, side: THREE.DoubleSide, depthWrite: false, uniforms: { col: { value: col } },
+        vertexShader: 'attribute float h; varying float vH; void main() { vH = h; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: 'uniform vec3 col; varying float vH; void main() { gl_FragColor = vec4(mix(col * 0.75, col, vH), 0.06 + 0.42 * pow(vH, 1.6)); }' })));
       path.legs.forEach(([name, lat, lon, ft, flag], i) => { const v = pts[i]; D.push(v.x, v.y, v.z, v.x, gz(v), v.z);
         const key = name + lat + lon; if (seen.has(key)) return; seen.add(key);
         const cv = document.createElement('canvas'); cv.width = 320; cv.height = 96; const c = cv.getContext('2d');
@@ -484,26 +490,20 @@ export function createEngine(canvas, cb) {
         c.font = '28px ui-monospace, monospace'; c.fillStyle = 'rgba(255,255,255,.7)'; c.fillText((flag === 'ap' ? '≈ ' : '') + ft.toLocaleString('en') + ' ft', 160, 80);
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthTest: false, sizeAttenuation: false }));
         sp.scale.set(.1, .03, 1); sp.center.set(.5, -.4); sp.position.set(v.x, v.y * zex, v.z); add(sp, scene);
-        const dot = new THREE.Mesh(new THREE.SphereGeometry(55, 12, 8), new THREE.MeshBasicMaterial({ color: flag === 'ap' ? 0x9aa0a6 : 0xffffff }));
+        const dot = new THREE.Mesh(new THREE.SphereGeometry(35, 12, 8), new THREE.MeshBasicMaterial({ color: flag === 'ap' ? 0x9aa0a6 : 0xffffff }));
         dot.position.copy(v); dot.scale.y = 1 / zex; add(dot); });
       const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.Float32BufferAttribute(D, 3));
-      add(new THREE.LineSegments(dg, new THREE.LineBasicMaterial({ color: path.ma ? 0xf5a524 : pr.color, transparent: true, opacity: .45 }))); }
+      add(new THREE.LineSegments(dg, new THREE.LineBasicMaterial({ color: path.ma ? 0xf5a524 : pr.color, transparent: true, opacity: .25 }))); }
     addPlanes(procs, add); }
 
   // ---------- aircraft on the shown procedures: one flies the approach and lands, one takes off and flies the missed-approach
   // route (there is no SID data). Times are sped up (AIR m/s ≈ 12× an approach speed); each loops with a short pause.
   const AIR = 875, ROLL = 38, planes = [], planeMat = new Map();
-  let planeGeo = null;
-  const finMat = color => { if (!planeMat.has(color)) planeMat.set(color, new THREE.MeshLambertMaterial({ color })); return planeMat.get(color); };
-  function planeModel(color) {   // nose +Z, ~70 m span: about the procedure line's width
-    if (!planeGeo) planeGeo = { body: new THREE.MeshLambertMaterial({ color: 0xf4f6f8 }),
-      fus: new THREE.CylinderGeometry(4, 3, 58, 12).rotateX(Math.PI / 2), nose: new THREE.ConeGeometry(4, 11, 12).rotateX(Math.PI / 2).translate(0, 0, 34.5),
-      wing: new THREE.BoxGeometry(70, 1.6, 11).translate(0, -1.5, 3), stab: new THREE.BoxGeometry(26, 1, 6).translate(0, 1, -25),
-      fin: new THREE.BoxGeometry(1, 13, 8).translate(0, 7.5, -24) };
-    finMat(color);
-    const { body, fus, nose, wing, stab, fin } = planeGeo, g = new THREE.Group();
-    for (const geo of [fus, nose, wing, stab]) g.add(new THREE.Mesh(geo, body));
-    g.add(new THREE.Mesh(fin, planeMat.get(color))); return g; }
+  const finMat = color => { if (!planeMat.has(color)) planeMat.set(color, new THREE.MeshPhongMaterial({ color, shininess: 60, side: THREE.DoubleSide })); return planeMat.get(color); };
+  let planeProto = null;
+  function planeModel(color) {   // AIRTRIX B737-800 (plane3d.js, nose +x) turned nose +Z for lookAt, at twice its size: ~70 m span, the line's width
+    if (!planeProto) { planeProto = new THREE.Group(); const m = buildAircraft(B738); m.rotation.y = -Math.PI / 2; m.scale.setScalar(2); planeProto.add(m); }
+    const g = planeProto.clone(); g.userData.fin = g.getObjectByName('fin'); g.userData.fin.material = finMat(color); return g; }
   // nodes: [x, metres AMSL, z, speed m/s, ground?]; the segment time uses the mean of its end speeds
   function track(nodes) { const t = [0];
     for (let i = 1; i < nodes.length; i++) { const a = nodes[i - 1], b = nodes[i];
@@ -539,7 +539,7 @@ export function createEngine(canvas, cb) {
       const pool = Array.from({ length: n }, () => { const o = planeModel(seq[0].color); add(o, scene); return o; }); planes.push({ pool, seq, off }); } }
   const _a = new THREE.Vector3(), _b = new THREE.Vector3();
   // Line-sized up close, growing with the camera distance (span ≈ 5 % of it) so it stays visible from the overview.
-  // While smaller than the 22 m tube it rides on top of it; larger, it flies on the line. On the ground it sits on its wheels.
+  // While small it rides just above the path line; larger, it flies on the line. On the ground it sits on its wheels.
   function flyPlanes(now) { if (!planes.length) return; const zex = G.scale.y;
     for (const p of planes) { const cycle = p.seq.reduce((n, q) => n + q.gap, 0), t0 = (now / 1000 + p.off) % cycle;
       const live = [];                                     // launches still in the air: this cycle's and earlier cycles'
@@ -547,12 +547,12 @@ export function createEngine(canvas, cb) {
         for (let j = 0, start = 0; j < p.seq.length; start += p.seq[j].gap, j++) { const age = t0 - start + c * cycle;
           if (age >= 0 && age < p.seq[j].tr.T) live.push([p.seq[j].tr, age, p.seq[j].color]); }
       p.live = live.length;
-      p.pool.forEach((o, n) => { o.visible = n < live.length; if (o.visible) { o.children[4].material = finMat(live[n][2]); flyOne(o, live[n][0], live[n][1], zex); } }); } }
+      p.pool.forEach((o, n) => { o.visible = n < live.length; if (o.visible) { o.userData.fin.material = finMat(live[n][2]); flyOne(o, live[n][0], live[n][1], zex); } }); } }
   function flyOne(o, tr, tt, zex) { const { nodes, t } = tr;
       let i = 1; while (i < t.length - 1 && t[i] < tt) i++;
       const f = Math.min(1, (tt - t[i - 1]) / (t[i] - t[i - 1] || 1)), a = nodes[i - 1], b = nodes[i];
       _a.set(a[0], a[1] * zex, a[2]); _b.set(b[0], b[1] * zex, b[2]); o.position.lerpVectors(_a, _b, f);
-      const k = Math.max(1, 0.05 * camera.position.distanceTo(o.position) / 70), lift = (n) => (n[4] ? 5 * k : Math.max(0, 22 * zex + 5 - 4 * k));
+      const k = Math.max(1, 0.05 * camera.position.distanceTo(o.position) / 70), lift = (n) => (n[4] ? 0 : Math.max(0, 9 * zex + 5 - 4 * k));
       o.scale.setScalar(k); o.position.y += lift(a) + (lift(b) - lift(a)) * f; _b.y += lift(b);
       if (o.position.distanceToSquared(_b) > 1) o.lookAt(_b); }
 
@@ -604,6 +604,35 @@ export function createEngine(canvas, cb) {
       const [r, gg, bb] = rgb[b], q = k * 4; d[q] = r; d[q + 1] = gg; d[q + 2] = bb; d[q + 3] = edge ? 235 : 110; }
     c.putImageData(img, 0, 0); K.b = null; scheduleSync(); }
 
+  // Noise in 3D: sound waves. An emitter flies each noise track on its aircraft's ANP profile (the fleet's largest share)
+  // and sends out shells; a shell's ground ring takes the Lden band where it has reached and the shell fades out at the
+  // lowest band shown. Shells are drawn at true scale (no vertical exaggeration). Time is sped up (≈ 7 s from source to the outer contour), so it reads as spreading, not as a level.
+  const nzOn = k => !!(state.noise && state[k] && NZ.grid && !NZ.busy);   // noise3d: the waves, noiseBld: buildings in band colours
+  const bandAt = v => { const B = noiseBands(); for (let k = B.length - 1; k >= (state.noiseFrom || 0); k--) if (v >= B[k][0]) return k; return -1; };
+  const WV = { em: [], geo: new THREE.SphereGeometry(1, 40, 20), plane: null };
+  const waveMat = () => new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { col: { value: new THREE.Color() }, op: { value: 0 } },
+    vertexShader: 'varying vec3 vN, vV; void main() { vec4 p = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-p.xyz); gl_Position = projectionMatrix * p; }',
+    fragmentShader: 'uniform vec3 col; uniform float op; varying vec3 vN, vV; void main() { float r = 1.0 - abs(dot(normalize(vN), normalize(vV))); gl_FragColor = vec4(col, op * (0.06 + 0.94 * r * r * r)); }' });
+  function buildNoise3d() {
+    WV.em.forEach(e => { e.sh.forEach(m => { scene.remove(m); m.material.dispose(); }); scene.remove(e.dot); }); WV.em = []; if (!nzOn('noise3d')) return;
+    const c = noiseCfg(), ac = [...c.fleet].sort((a, b) => b[1] - a[1])[0][0], FT = 0.3048;
+    noiseTracks(c).sort((a, b) => b.n - a.n).slice(0, 8).forEach((tr, i) => {
+      const prof = ANP[ac][tr.mode === 'A' ? 'app' : 'dep'].map(q => [q[0] * FT, q[1] * FT]);
+      const s0 = tr.mode === 'A' ? -12000 : 0, s1 = tr.mode === 'A' ? 0 : 12000;
+      const sh = Array.from({ length: 4 }, () => { const m = new THREE.Mesh(WV.geo, waveMat()); m.visible = false; m.renderOrder = 2; scene.add(m); return { m, t0: -1e9 }; });
+      const dot = (WV.plane || (WV.plane = buildAircraft(B738))).clone(); dot.rotation.y = Math.atan2(tr.uy, tr.ux); scene.add(dot);   // AIRTRIX model, nose along the track
+      WV.em.push({ tr, prof, s0, s1, sh: sh.map(o => o.m), st: sh, dot, ph: i * 5.6, k: 0, next: 0 }); }); }
+  const profH = (prof, s) => { for (let i = 1; i < prof.length; i++) if (s <= prof[i][0] || i === prof.length - 1) { const [x1, h1] = prof[i - 1], [x2, h2] = prof[i]; return Math.max(0, h1 + (h2 - h1) * Math.min(1, Math.max(0, (s - x1) / ((x2 - x1) || 1)))); } return 0; };
+  function waves(now) { if (!WV.em.length) return; const t = now / 1000, zex = G.scale.y, B = noiseBands(), g = NZ.grid, L0 = B[state.noiseFrom || 0][0], LIFE = 7, GAP = LIFE / 4;   // slow, sparse rings: about 7 s from source to the outer contour
+    for (const e of WV.em) { const { tr } = e, f = ((t + e.ph) % 45) / 45, s = e.s0 + (e.s1 - e.s0) * f, x = tr.x + tr.ux * s, y = tr.y + tr.uy * s, H = profH(e.prof, s);   // true scale (not exaggerated), so a shell meets the ground where the sound does
+      e.dot.position.set(x, state.E * zex + H, -y); e.dot.rotation.z = H > 1 ? (tr.mode === 'A' ? 2 : 10) * Math.PI / 180 : 0; e.dot.scale.setScalar(Math.max(1, camera.position.distanceTo(e.dot.position) / 1000));   // pitch: approach / climb; enlarged when far, so it reads
+      if (t >= e.next) { e.next = t + GAP; let R = 0; for (let r = 100; r <= 8000; r += 100) { if (lnAt(g, x - tr.uy * r, y + tr.ux * r) < L0 && lnAt(g, x + tr.uy * r, y - tr.ux * r) < L0) break; R = r; }
+        const o = e.st[e.k++ % e.st.length]; Object.assign(o, { t0: t, x, y, H: state.E * zex + H, h: H, R: Math.hypot(R, H), on: R > 0 }); }
+      for (const o of e.st) { const a = (t - o.t0) / LIFE, m = o.m; m.visible = o.on && a >= 0 && a < 1; if (!m.visible) continue;
+        const r = a * o.R, rg = Math.sqrt(Math.max(0, r * r - o.h * o.h)), b = bandAt(lnAt(g, o.x - tr.uy * rg, o.y + tr.ux * rg));
+        if (b < 0 && rg > 0) { m.visible = false; continue; }
+        m.position.set(o.x, o.H, -o.y); m.scale.setScalar(Math.max(r, 1)); m.material.uniforms.col.value.set(B[Math.max(b, state.noiseFrom || 0)][3]); m.material.uniforms.op.value = 0.45 * Math.sin(Math.PI / 2 * Math.min(1, a * 4)) * (1 - a) ** 1.5; } } }
+
   function sync() { if (!alive || !AP) return;
     const rwsEx = frames(false), rwsExt = frames(true), rws = scen() === 'ext' ? rwsExt : rwsEx;
     const kG = APID + '|' + (AP.dem ? 1 : 0); if (K.g !== kG) { K.g = kG; buildGround(); K.t = null; K.o = null; }   // terrain arrived after the first draw: obstacles' ground heights must be rebuilt too
@@ -611,7 +640,8 @@ export function createEngine(canvas, cb) {
     const kS = k0 + '|' + [...state.surf].sort().join(',');
     if (K.s !== kS) { K.s = kS; buildSurfaces(rwsEx, rwsExt); }
     if (K.r !== k0) { K.r = k0; buildRunways(rwsEx, rwsExt); }
-    const kO = k0 + '|' + state.bldH + '|' + state.obs; if (K.o !== kO) { K.o = kO; buildObstacles(rws); }
+    const kz = k => nzOn(k) ? NZ.key + '|' + (state.noiseFrom || 0) : '', kO = k0 + '|' + state.bldH + '|' + state.obs + '|' + kz('noiseBld'); if (K.o !== kO) { K.o = kO; buildObstacles(rws); }
+    const k3s = kz('noise3d'); if (K.z !== k3s) { K.z = k3s; buildNoise3d(); }
     const kT = k0 + '|' + state.pen, kB = kT + '|' + state.base;
     if (K.t !== kT) { K.t = kT; buildOverlay(rwsEx, rwsExt); K.b = null; }
     if (K.b !== kB || texPending) { K.b = kB; buildBase(); } else if (hiPending) buildHi();
@@ -627,7 +657,7 @@ export function createEngine(canvas, cb) {
     const r = kind === 'rwy' ? AP.fitRwy : AP.fitAll, ax = frames(false)[0], c = Wp(ax, ax.L / 2, 0);
     ctl.target.set(c[0], state.E * G.scale.y, -c[1]); camera.position.set(c[0] - r * .9, state.E * G.scale.y + r * .8, -c[1] + r * .9); ctl.update(); }
   function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
-  function loop() { if (!alive) return; ctl.update(); flyPlanes(performance.now()); renderer.render(scene, camera); requestAnimationFrame(loop); }
+  function loop() { if (!alive) return; ctl.update(); const now = performance.now(); flyPlanes(now); waves(now); renderer.render(scene, camera); requestAnimationFrame(loop); }
 
   // ---------- picking: obstacle → its clearance, otherwise the OLS limit at that point ----------
   const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();

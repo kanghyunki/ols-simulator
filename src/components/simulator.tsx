@@ -92,7 +92,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
   // Obstacle surfaces turns the noise contours off and brings them back
   const olsPrev = useRef<{ surf: string[]; pen: boolean } | null>(null);
   useEffect(() => { const e = eng.current, s = e?.snapshot().state; if (!e || !s) return;
-    if (tab === "noise") { if (s.surf.length) olsPrev.current = { surf: s.surf as string[], pen: !!s.pen }; e.set({ noise: true, surf: [], pen: false }); }
+    if (tab === "noise") { if (s.surf.length) olsPrev.current = { surf: s.surf as string[], pen: !!s.pen }; e.set({ noise: true, noise3d: true, surf: [], pen: false }); }
     else if (tab === "ols" && s.noise) { const p = olsPrev.current; e.set({ noise: false, surf: p?.surf.length ? p.surf : DEFAULT_KEYS, pen: p?.pen ?? true }); }
   }, [tab]);
   // Top picker: folded to one line; unfolds on hover / focus / click, folds again once an airport is picked
@@ -352,6 +352,8 @@ export function Simulator({ onHome }: { onHome: () => void }) {
             const pct = (v: number) => `${Math.round(v * 100)}%`;
             return <>
               <Toggle size="sm" className={pill} pressed={!!st?.noise} onPressedChange={(v) => set({ noise: v })}>{t("Show Lden contours", "Lden 등고선 표시")}</Toggle>
+              <Toggle size="sm" className={pill} disabled={!st?.noise} pressed={!!st?.noise3d} onPressedChange={(v) => set({ noise3d: v })}>{t("Sound waves (3D)", "3D 음파 확산")}</Toggle>
+              <Toggle size="sm" className={pill} disabled={!st?.noise} pressed={!!st?.noiseBld} onPressedChange={(v) => set({ noiseBld: v })}>{t("Buildings by Lden", "건물별 소음 색")}</Toggle>
               {runwayButtons}
               <div className="mt-3 text-[11px] text-white/45">{kr ? t("Korean airport noise zones (Lden, from 2023)", "국내 소음대책지역 기준 (Lden, 2023~)") : t("International comparison (EU, Lden 5 dB bands)", "국제 비교 기준 (EU, Lden 5 dB 단위)")}</div>
               {nz.busy ? <Note>{t("Computing", "계산 중")} {Math.round((nz.progress ?? 0) * 100)}%…</Note> : nz.bands && st?.noise && (
