@@ -6,14 +6,14 @@ import { SiteNav } from "@/components/site-nav";
 import { Landing, type FanMode } from "@/components/landing";
 import { Simulator } from "@/components/simulator";
 import { useT } from "@/lib/lang";
-import { supabase } from "@/lib/supabase";
+import { DEV, supabase } from "@/lib/supabase";
 
 // landing → (Explore) leaving: the fan spools up and the camera flies into the hub → app: the simulator mounts
 // (after the fly-in, so its first heavy build does not stutter the animation) and the landing fades out over it.
 // app → (Home) returning: the landing fades back in from inside the hub and pulls out → landing: the simulator unmounts.
 // A link with an airport hash (#ICN) skips straight to the simulator. The simulator is for members: without a session,
 // Explore and airport links go to /login, which comes back here (?next) once signed in or signed up with Google.
-const signedIn = () => supabase.auth.getSession().then(({ data }) => !!data.session).catch(() => false);
+const signedIn = () => (DEV ? Promise.resolve(true) : supabase.auth.getSession().then(({ data }) => !!data.session).catch(() => false));   // next dev: no gate
 const toLogin = (next: string) => location.assign(`/login?next=${encodeURIComponent(next)}`);
 type Phase = "init" | "landing" | "leaving" | "app" | "returning";
 const FAN: Record<Phase, FanMode> = { init: "idle", landing: "idle", leaving: "leave", app: "leave", returning: "enter" };
