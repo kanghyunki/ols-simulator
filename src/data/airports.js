@@ -164,7 +164,7 @@ const AIRPORTS={
       +'· 확장 시 신설 시단 표고는 기존 말단과 동일 가정.'
   },
   ICN:{
-    name:'인천', sub:'RKSI · Incheon Intl · Korea', region:'NEA', E:7.0,
+    name:'인천', sub:'RKSI · Incheon Intl · Korea', region:'NEA', E:7.0, adg:'V',
     osm:null, dem:null, demFile:{url:"dem/ICN.bin?v=2",x0:-18749.03,y0:-18887.07,dx:30,dy:30,nx:1252,ny:1258,s:0.1,zmax:456,src:"GEDTM30 (OpenLandMap, CC BY 4.0), bare-earth DTM, EGM2008"},
     rwys:[ // THR 좌표·표고: AIP 대한민국 RKSI AD 2.12 (AMDT 08/2026, WEF 20 AUG 2026)
       {id:'1 15R/33L', nameA:'15R', nameB:'33L', len:3750,

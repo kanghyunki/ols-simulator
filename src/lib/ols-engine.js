@@ -21,9 +21,34 @@ export const SURFACES = [
 export const OFZ_SURFACES = [
   ['innerapp', 'Inner approach', 0xf472b6], ['innertrans', 'Inner transitional', 0xfb7185], ['balked', 'Balked landing', 0xf59e0b],
 ];
-const COLOR = Object.fromEntries([...SURFACES, ...OFZ_SURFACES].map(([k, , c]) => [k, c]));
+// Annex 14 Amendment 18 (applicable 21 November 2030, state.rev = 'new'): obstacle free surfaces and obstacle evaluation surfaces
+export const OFS_SURFACES = [
+  ['ofs_app', 'OFS approach', 0x2f6fe4], ['ofs_trans', 'OFS transitional', 0xd6409f], ['ofs_iapp', 'OFS inner approach', 0xf472b6],
+  ['ofs_itrans', 'OFS inner transitional', 0xfb7185], ['ofs_balked', 'OFS balked landing', 0xf59e0b],
+];
+export const OES_SURFACES = [
+  ['oes_horiz', 'OES horizontal', 0x5aa9e6], ['oes_sia', 'OES straight-in approach', 0x8a7bb8], ['oes_pa', 'OES precision approach', 0x22c3a6],
+  ['oes_dep', 'OES instrument departure', 0xa3e635], ['oes_toc', 'OES take-off climb', 0x19b3a6],
+];
+const COLOR = Object.fromEntries([...SURFACES, ...OFZ_SURFACES, ...OFS_SURFACES, ...OES_SURFACES].map(([k, , c]) => [k, c]));
 export const ALL_KEYS = [...SURFACES, ...OFZ_SURFACES].map(([k]) => k);
 export const DEFAULT_KEYS = ALL_KEYS.filter(k => k !== 'takeoff');   // the take-off climb surface starts off (it is rarely the governing one)
+export const NEW_DEFAULT_KEYS = [...OFS_SURFACES.map(([k]) => k), 'oes_horiz', 'oes_pa'];
+
+// ---------- Amendment 18 dimensions by aeroplane design group (Tables 4-1 to 4-15; half-widths in m) ----------
+const ADGS = ['I', 'IIA', 'IIB', 'IIC', 'III', 'IV', 'V'];
+function newP(adg) { const g = Math.max(0, ADGS.indexOf(adg)), pick = (I, IIAB, IIC, III, IV, V) => [I, IIAB, IIAB, IIC, III, IV, V][g];
+  return { g,
+    appI: { d0: 60, w: pick(110, 125, 155, 175, 185, 200) / 2, len: 4500, s: 0.0333 },                        // 4-2 instrument runways
+    appN: { d0: g ? 60 : 30, w: pick(60, 80, 100, 125, 135, 150) / 2, len: g ? 2500 : 1600, s: pick(0.05, 0.04, 0.0333, 0.0333, 0.0333, 0.0333) },   // 4-1
+    iapp: { non: [pick(60, 80, 100, 110, 120, 120) / 2, pick(900, 1125, 1350, 1350, 1350, 1350)],              // 4-3 / 4-4 / 4-5: [half width, length]
+            np: [pick(80, 80, 120, 120, 120, 120) / 2, 1350], p: [pick(90, 90, 120, 120, 120, 120) / 2, 1350] },
+    itV: { non: pick(6, 6, 8.4, 10, 5, 5), np: pick(6, 6, 5, 5, 5, 5) }, itS: pick(0.4, 0.4, 0.333, 0.333, 0.333, 0.333),   // 4-6 to 4-8
+    small: g <= 2,                                                                                              // ADG I-IIB: to the end of the strip
+    bl: { w: pick(90, 90, 120, 120, 120, 120) / 2, s: pick(0.05, 0.04, 0.0333, 0.0333, 0.0333, 0.0333) },      // 4-9
+    horiz: [[3350, 45], [5350, 60], [10750, 90]].slice(0, g <= 1 ? 1 : g === 2 ? 2 : 3),                      // 4-10, every group up to the airport's
+    toc: { w: pick(144, 156, 156, 172, 180, 180) / 2, s: pick(0.05, 0.04, 0.02, 0.02, 0.02, 0.02) } };         // 4-15 (above 5 700 kg)
+}
 
 // ---------- Annex 14 Vol.I Tab.4-1/4-2 dimensions by code number (half-widths in m) ----------
 const OLSP = {
@@ -58,7 +83,7 @@ export function createEngine(canvas, cb) {
   // extA/extB: extension (m) per runway at the A / B end; showEx overlays the existing OLS for comparison
   // par: added parallel runways [{ ri, off, len }] — a copy of runway `ri` shifted `off` m to its left (A→B; negative = right),
   // centred on the reference (`shift` m along A→B moves that centre), `len` m long (default: the reference length), same threshold elevations
-  const state = { showEx: false, extA: [], extB: [], par: [], E: 39, base: 'sat', pen: true, obs: true, ofz: false, proc: [], bldH: 6,
+  const state = { showEx: false, extA: [], extB: [], par: [], E: 39, base: 'sat', pen: true, obs: true, ofz: false, rev: 'old', proc: [], bldH: 6,
     surf: new Set(DEFAULT_KEYS), rot: true, zex: 5, noise: false, noise3d: false, noiseBld: false, noiseCfg: null };   // noiseCfg: overrides of NOISE_TRAFFIC (annual, north, evening, night)   // zex: vertical exaggeration, 5× by default so relief and the surfaces' slopes read at airport scale
 
   // ---------- coordinates / geometry core (per-runway frames) ----------
@@ -106,6 +131,7 @@ export function createEngine(canvas, cb) {
   }
   // Every surface of one runway at P: c(height, name, key) per candidate
   function olsCand(P, rw, c) {
+    if (state.rev === 'new') return olsCandNew(P, rw, c);
     const p = olsP();
     const [s, dd] = sd(P, rw), d = Math.abs(dd), E = state.E, L = rw.L, IH = E + 45;
     const Ecl = rw.eA + (rw.eB - rw.eA) * Math.max(0, Math.min(1, s / L));
@@ -132,6 +158,49 @@ export function createEngine(canvas, cb) {
     const r = distSeg(P[0], P[1], S1[0], S1[1], S2[0], S2[1]);
     if (r <= p.ihR) c(IH, 'Inner horizontal', 'ih'); else if (r <= p.ihR + p.con / 0.05) c(IH + 0.05 * (r - p.ihR), 'Conical', 'conical');
   }
+  // Amendment 18. Runway ends: precision where the airport has an ILS procedure for it, otherwise an instrument (non-precision)
+  // end on code 3-4 airports and a non-instrument end below that; airports without procedure data count their code 4 ends as
+  // precision. The OFS transitional uses the 20 % maximum slope from the approach surface's inner-edge half-width (4.2.2.5).
+  const adgOf = () => AP.adg || { 4: 'IV', 3: 'III', 2: 'IIB', 1: 'I' }[AP.code || 4];
+  function endType(name) { const pr = PROCEDURES[APID], n = name.replace('′', ''), code = AP.code || 4;
+    if (pr) return pr.some(q => q.rwy === n && /ILS|GLS/.test(q.id + q.name)) ? 'p' : code >= 3 ? 'np' : 'non';
+    return code >= 4 ? 'p' : code >= 3 ? 'np' : 'non'; }
+  function olsCandNew(P, rw, c) {
+    const p = newP(adgOf()), [s, dd] = sd(P, rw), d = Math.abs(dd), E = state.E, L = rw.L, Hmax = Math.max(rw.eA, rw.eB) + 60;
+    const Ecl = x => rw.eA + (rw.eB - rw.eA) * Math.max(0, Math.min(1, x / L));
+    const T = [{ atA: true, name: rw.nameA, Et: rw.eA, cwy: rw.cwyA, dep: rw.nameB }, { atA: false, name: rw.nameB, Et: rw.eB, cwy: rw.cwyB, dep: rw.nameA }];
+    const instr = T.some(e => endType(e.name) !== 'non');
+    for (const e of T) { const ty = endType(e.name), sl = e.atA ? s : L - s, ua = -sl, Et = e.Et, at = x => Ecl(e.atA ? x : L - x);   // sl: along the landing direction from this threshold
+      const A = ty === 'non' ? p.appN : p.appI, x = ua - A.d0, wA = A.w + 0.10 * Math.max(0, x), hA = Et + A.s * x;
+      // approach + transitional (OFS)
+      if (x >= 0 && x <= A.len) { if (d <= wA) c(hA, 'OFS approach RWY ' + e.name, 'ofs_app');
+        else if (hA < Hmax) { const h = hA + 0.2 * (d - wA); if (h <= Hmax) c(h, 'OFS transitional', 'ofs_trans'); } }
+      if (sl >= -60 && sl <= L + 60 && d > A.w) { const h = at(sl) + 0.2 * (d - A.w); if (h <= Hmax) c(h, 'OFS transitional', 'ofs_trans'); }
+      // inner approach, inner transitional, balked landing (OFS)
+      const [b, iL] = p.iapp[ty], k = p.itS, sb = p.small ? L + 60 : Math.min(1800, L), hv = ty === 'p' ? 0 : p.itV[ty];   // sb: balked landing inner edge / end of the inner transitional
+      if (x >= 0 && x <= iL) { if (d <= b) c(hA, 'OFS inner approach RWY ' + e.name, 'ofs_iapp');
+        else { const h = hA + hv + k * (d - b); if (h <= Hmax) c(h, 'OFS inner transitional', 'ofs_itrans'); } }
+      if (sl >= -60 && sl <= sb && d > b) { const h = at(sl) + hv + k * (d - b); if (h <= Hmax) c(h, 'OFS inner transitional', 'ofs_itrans'); }
+      if (ty === 'p' && sl >= sb) { const v = sl - sb, wb = p.bl.w + 0.10 * v, hb = at(sb) + p.bl.s * v;
+        if (hb <= Hmax) { if (d <= wb) c(hb, 'OFS balked landing RWY ' + e.name, 'ofs_balked');
+          else { const h = hb + k * (d - wb); if (h <= Hmax) c(h, 'OFS inner transitional', 'ofs_itrans'); } } }
+      // surface for precision approaches (OES): approach, missed approach and lower components, transitional components to 300 m
+      if (ty === 'p') { const xa = ua - 60, m = sl - 900, top = Et + 300;
+        const wa = 150 + 0.15 * Math.max(0, xa), ha = Et + (xa <= 3000 ? 0.02 * xa : 60 + 0.025 * (xa - 3000));
+        const wm = 150 + (m <= 1800 ? 0.1748 * Math.max(0, m) : 314.64 + 0.25 * (m - 1800)), hm = Et + 0.025 * m;
+        const tr = (h0, w) => { if (h0 >= top) return; const h = h0 + 0.143 * (d - w); if (h <= top) c(h, 'OES precision approach', 'oes_pa'); };
+        if (xa >= 0 && xa <= 12600) { if (d <= wa) c(ha, 'OES precision approach RWY ' + e.name, 'oes_pa'); else tr(ha, wa); }
+        if (m >= 0 && m <= 12000) { if (d <= wm) c(hm, 'OES precision approach RWY ' + e.name, 'oes_pa'); else tr(hm, wm); }
+        if (sl >= -60 && sl <= 900) { if (d <= 150) c(Et, 'OES precision approach RWY ' + e.name, 'oes_pa'); else tr(Et, 150); } }
+      // beyond this end, departures the other way: instrument departure and take-off climb (OES) from the end of the TODA
+      const xt = -sl - Math.max(0, e.cwy || 0);
+      if (xt >= 0) { if (instr && xt <= 11800) { const w = 150 + (xt <= 3500 ? 0.268 * xt : 938 + 0.578 * (xt - 3500)); if (d <= w) c(Et + 5 + 0.025 * xt, 'OES instrument departure RWY ' + e.dep, 'oes_dep'); }
+        if (xt <= 10000 && d <= Math.min(p.toc.w + 0.125 * xt, 900)) c(Et + p.toc.s * xt, 'OES take-off climb RWY ' + e.dep, 'oes_toc'); } }
+    // horizontal (OES): circles on the thresholds joined tangentially, one layer per design group up to the airport's
+    const r = distSeg(P[0], P[1], rw.A[0], rw.A[1], rw.B[0], rw.B[1]);
+    for (const [R, H] of p.horiz) if (r <= R) { c(E + H, 'OES horizontal', 'oes_horiz'); break; }
+    if (instr) { if (r <= 3350) c(E + 45, 'OES straight-in approach', 'oes_sia'); else if (s >= -5350 && s <= L + 5350 && d <= 3705) c(E + 60, 'OES straight-in approach', 'oes_sia'); }
+  }
   // Each surface on its own (min over the included runways): { key: height } — for drawing full surfaces, not just the governing one
   function olsAll(P, rws) { const o = {};
     for (const rw of rws) { if (!rw.on) continue; olsCand(P, rw, (hh, n, k) => { if (!(k in o) || hh < o[k]) o[k] = hh; }); }
@@ -141,6 +210,7 @@ export function createEngine(canvas, cb) {
     // The inner horizontal starts where the transitional surfaces reach its height: it is not drawn over the strip, the
     // transitional or the part of an approach still below it, so their colours are not tinted by it
     if ('ih' in o && ['strip', 'transitional', 'approach'].some(k => o[k] < o.ih)) delete o.ih;
+    if ('oes_horiz' in o && ['ofs_app', 'ofs_trans', 'ofs_iapp', 'ofs_itrans', 'ofs_balked'].some(k => o[k] < o.oes_horiz)) delete o.oes_horiz;
     return o; }
   // Combined OLS = minimum over the included runways
   function ols(P, rws, allow) { let best = null;
@@ -293,7 +363,8 @@ export function createEngine(canvas, cb) {
   function clear(list) { list.forEach(m => { G.remove(m); m.geometry.dispose(); }); list.length = 0; }
   function extent(rws) { let x1 = 1e9, x2 = -1e9, y1 = 1e9, y2 = -1e9, any = false;
     rws.forEach(rw => { if (!rw.on) return; any = true;
-      for (const s of [-15660, rw.L + 15660]) for (const d of [-6300, 6300]) { const P = Wp(rw, s, d);
+      const sx = state.rev === 'new' ? 13000 : 15660, dx = state.rev === 'new' ? 10800 : 6300;   // amendment 18: 12.6 km approach / 12.9 km missed approach, 10.75 km horizontal
+      for (const s of [-sx, rw.L + sx]) for (const d of [-dx, dx]) { const P = Wp(rw, s, d);
         x1 = Math.min(x1, P[0]); x2 = Math.max(x2, P[0]); y1 = Math.min(y1, P[1]); y2 = Math.max(y2, P[1]); } });
     return any ? { x1, x2, y1, y2 } : { x1: -6000, x2: 6000, y1: -6000, y2: 6000 }; }
   // One grid pass → per-surface height arrays (NaN where the surface does not exist), then a mesh per surface.
@@ -356,7 +427,7 @@ export function createEngine(canvas, cb) {
       const ex = extent(rws), step = 80, { nx, ny, H } = sampleGrid(ex, step, rws);
       const lineMat = () => new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .16, depthWrite: false });
       for (const k of state.surf) {
-        if (TRANS[k]) { if (k === 'innertrans' && !state.ofz) continue;
+        if (TRANS[k] && state.rev !== 'new') { if (k === 'innertrans' && !state.ofz) continue;
           const [g, e] = transGeom(rws, ...TRANS[k](olsP()));
           const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: uni ?? COLOR[k], transparent: true, opacity: uni ? .3 : .5, side: THREE.DoubleSide, depthWrite: false }));
           G.add(m); L.surf.push(m); const gl = new THREE.LineSegments(e, lineMat()); G.add(gl); L.grid.push(gl); continue; }
@@ -635,7 +706,7 @@ export function createEngine(canvas, cb) {
   function sync() { if (!alive || !AP) return;
     const rwsEx = frames(false), rwsExt = frames(true), rws = scen() === 'ext' ? rwsExt : rwsEx;
     const kG = APID + '|' + (AP.dem ? 1 : 0); if (K.g !== kG) { K.g = kG; buildGround(); K.t = null; K.o = null; }   // terrain arrived after the first draw: obstacles' ground heights must be rebuilt too
-    const k0 = [APID, scen(), state.extA.join(','), state.extB.join(','), parKey(), state.E, state.ofz ? 1 : 0, AP._on.join('')].join('|');
+    const k0 = [APID, scen(), state.extA.join(','), state.extB.join(','), parKey(), state.E, state.ofz ? 1 : 0, state.rev, AP._on.join('')].join('|');
     const kS = k0 + '|' + [...state.surf].sort().join(',');
     if (K.s !== kS) { K.s = kS; buildSurfaces(rwsEx, rwsExt); }
     if (K.r !== k0) { K.r = k0; buildRunways(rwsEx, rwsExt); }

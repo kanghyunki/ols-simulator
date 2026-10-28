@@ -6,9 +6,10 @@ import { LangButton } from "@/components/lang-button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PROCEDURES, PROC_NOTES } from "@/data/procedures.js";
 import { useT } from "@/lib/lang";
-import { createEngine, AIRPORTS, SURFACES as _S, OFZ_SURFACES as _O, ALL_KEYS as _K, DEFAULT_KEYS as _D } from "@/lib/ols-engine.js";
+import { createEngine, AIRPORTS, SURFACES as _S, OFZ_SURFACES as _O, ALL_KEYS as _K, DEFAULT_KEYS as _D, OFS_SURFACES as _F, OES_SURFACES as _E, NEW_DEFAULT_KEYS as _N } from "@/lib/ols-engine.js";
 type Surf = [string, string, number];
 const SURFACES = _S as unknown as Surf[], OFZ_SURFACES = _O as unknown as Surf[], ALL_KEYS = _K as string[], DEFAULT_KEYS = _D as string[];
+const OFS_SURFACES = _F as unknown as Surf[], OES_SURFACES = _E as unknown as Surf[], NEW_DEFAULT_KEYS = _N as string[];
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Engine = ReturnType<typeof createEngine>;
@@ -29,7 +30,9 @@ const REGIONS = [["NEA", "North-east Asia", "동북아시아"], ["SEA", "South-e
   ["NAM", "North America", "북미"], ["SAM", "South America", "남미"], ["AFR", "Africa", "아프리카"]];
 // Korean names for the engine's surface names ("Approach RWY 15R" → "진입표면 RWY 15R") and building types
 const SURF_KO: Record<string, string> = { "Runway strip": "착륙대", Approach: "진입표면", "Take-off climb": "이륙상승표면", Transitional: "전이표면", "Inner horizontal": "수평표면",
-  Conical: "원추표면", "Inner approach": "내부진입표면", "Inner transitional": "내부전이표면", "Balked landing": "착륙복행표면" };
+  Conical: "원추표면", "Inner approach": "내부진입표면", "Inner transitional": "내부전이표면", "Balked landing": "착륙복행표면",
+  "OFS approach": "진입표면", "OFS transitional": "전이표면", "OFS inner approach": "내부진입표면", "OFS inner transitional": "내부전이표면", "OFS balked landing": "착륙복행표면",
+  "OES horizontal": "수평표면", "OES straight-in approach": "직진입 계기접근표면", "OES precision approach": "정밀접근표면", "OES instrument departure": "계기출발표면", "OES take-off climb": "이륙상승표면" };
 const TAG_KO: Record<string, string> = { Building: "건물", "Communications tower": "통신탑", Mast: "철탑", Tower: "탑", Chimney: "굴뚝", "Water tower": "급수탑",
   Lighthouse: "등대", Windmill: "풍차", "Power pylon": "송전탑", "Wind turbine": "풍력발전기" };
 const surfKo = (n: string) => n.replace(new RegExp(`^(${Object.keys(SURF_KO).join("|")})`), (m) => SURF_KO[m]);
@@ -93,7 +96,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
   const olsPrev = useRef<{ surf: string[]; pen: boolean } | null>(null);
   useEffect(() => { const e = eng.current, s = e?.snapshot().state; if (!e || !s) return;
     if (tab === "noise") { if (s.surf.length) olsPrev.current = { surf: s.surf as string[], pen: !!s.pen }; e.set({ noise: true, noise3d: true, surf: [], pen: false }); }
-    else if (tab === "ols" && s.noise) { const p = olsPrev.current; e.set({ noise: false, surf: p?.surf.length ? p.surf : DEFAULT_KEYS, pen: p?.pen ?? true }); }
+    else if (tab === "ols" && s.noise) { const p = olsPrev.current; e.set({ noise: false, surf: p?.surf.length ? p.surf : s.rev === "new" ? NEW_DEFAULT_KEYS : DEFAULT_KEYS, pen: p?.pen ?? true }); }
   }, [tab]);
   // Top picker: folded to one line; unfolds on hover / focus / click, folds again once an airport is picked
   // (hold keeps it folded under the pointer until the pointer leaves)
@@ -126,7 +129,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
   const st = snap?.state, ap = snap?.ap;
   useEffect(() => { setSel(new Set()); }, [snap?.apId]);
   // recomputed (debounced) only while Review or Report is open, whenever the scenario or the obstacle data change
-  const statKey = st && ap ? [snap.apId, st.extA.join(), st.extB.join(), JSON.stringify(st.par), st.ofz, st.obs, ap.dem, st.bldH].join("|") : "";
+  const statKey = st && ap ? [snap.apId, st.extA.join(), st.extB.join(), JSON.stringify(st.par), st.ofz, st.rev, st.obs, ap.dem, st.bldH].join("|") : "";
   useEffect(() => { if ((tab !== "check" && tab !== "report") || !statKey) return;
     const id = setTimeout(() => setStats(eng.current?.stats() ?? null), 250); return () => clearTimeout(id); }, [tab, statKey]);
   const scenName = st?.scen === "ex" ? t("existing airport", "현재 공항") : t("planned (extensions / parallel runways)", "계획안 (연장·평행활주로 반영)");
@@ -140,7 +143,8 @@ export function Simulator({ onHome }: { onHome: () => void }) {
     a.download = `OLS_${r.apId}_${st?.scen === "ex" ? "existing" : "planned"}.csv`; a.click(); URL.revokeObjectURL(a.href); };
   const set = (p: Record<string, unknown>) => eng.current?.set(p);
   const surf = new Set<string>(st?.surf ?? DEFAULT_KEYS);
-  const surfaces = st?.ofz ? [...SURFACES, ...OFZ_SURFACES] : SURFACES;
+  const isNew = st?.rev === "new";   // ICAO Annex 14 Amendment 18 (OFS / OES, applicable 21 Nov 2030) instead of the current OLS
+  const surfaces = isNew ? [...OFS_SURFACES, ...OES_SURFACES] : st?.ofz ? [...SURFACES, ...OFZ_SURFACES] : SURFACES;
   const airports = Object.entries(AIRPORTS as Record<string, any>).filter(([, a]) => a.region === region && countryOf(a) === country);
   const picker = (rows: string, picked?: () => void) => <>
     <Column label={t("Region", "지역")} rows={rows} items={REGIONS.map(([k]) => [k, regionName(k)])} value={region} onPick={(v) => { setRegion(v); setCountry(regionCountries(v)[0]); }} />
@@ -239,18 +243,28 @@ export function Simulator({ onHome }: { onHome: () => void }) {
         )}
 
         <H>{t("Obstacle surfaces", "장애물제한표면")}</H>
-        <Toggle size="sm" className={pill} pressed={surfaces.every(([k]) => k === "takeoff" || surf.has(k))} onPressedChange={(v) => set({ surf: v ? DEFAULT_KEYS : [] })}>{t("All", "전체")}</Toggle>
-        <div className={grid2}>
-          {surfaces.map(([k, label, c]) => (
-            <span key={k} className="flex min-w-0 items-center gap-1">
-              <Toggle size="sm" className={`${cell} flex-1`} pressed={surf.has(k)} onPressedChange={(v) => { const s = new Set(surf); if (v) s.add(k); else s.delete(k); set({ surf: [...s] }); }}>
-                <span className="size-1.5 shrink-0 rounded-full" style={{ background: hex(c) }} /><span className="truncate">{sn(label)}</span>
-              </Toggle>
-              <button className="shrink-0 text-[10px] text-white/35 hover:text-white/80" onClick={() => set({ surf: [k] })}>{t("only", "만 보기")}</button>
-            </span>
-          ))}
+        <div className="flex gap-1.5">
+          <Toggle size="sm" className={pill} pressed={!isNew} onPressedChange={() => set({ rev: "old", surf: DEFAULT_KEYS })}>{t("Current", "개정 전")}</Toggle>
+          <Toggle size="sm" className={pill} pressed={isNew} onPressedChange={() => set({ rev: "new", surf: NEW_DEFAULT_KEYS })}>{t("Amendment 18 (2030)", "개정 후 (2030)")}</Toggle>
+          <Toggle size="sm" className={pill} pressed={surfaces.every(([k]) => k === "takeoff" || surf.has(k))} onPressedChange={(v) => set({ surf: v ? (isNew ? surfaces.map(([k]) => k) : DEFAULT_KEYS) : [] })}>{t("All", "전체")}</Toggle>
         </div>
-        <Note>{t(`ICAO Annex 14 Vol. I Tab. 4-1 / 4-2, code ${ap?.code ?? 4}. Combined OLS = the lowest surface of the included runways.`, `ICAO Annex 14 Vol. I 표 4-1 / 4-2, 코드 ${ap?.code ?? 4}. 통합 OLS = 선택한 활주로들의 표면 중 가장 낮은 표면.`)}</Note>
+        {(isNew ? [[t("OFS · obstacle free surfaces", "OFS · 장애물금지표면"), OFS_SURFACES], [t("OES · obstacle evaluation surfaces", "OES · 장애물평가표면"), OES_SURFACES]] as [string, Surf[]][] : [["", surfaces]] as [string, Surf[]][]).map(([head, list]) => <div key={head}>
+          {head && <div className="mt-3 text-[11px] text-white/45">{head}</div>}
+          <div className={grid2}>
+            {list.map(([k, label, c]) => (
+              <span key={k} className="flex min-w-0 items-center gap-1">
+                <Toggle size="sm" className={`${cell} flex-1`} pressed={surf.has(k)} onPressedChange={(v) => { const s = new Set(surf); if (v) s.add(k); else s.delete(k); set({ surf: [...s] }); }}>
+                  <span className="size-1.5 shrink-0 rounded-full" style={{ background: hex(c) }} /><span className="truncate">{sn(label)}</span>
+                </Toggle>
+                <button className="shrink-0 text-[10px] text-white/35 hover:text-white/80" onClick={() => set({ surf: [k] })}>{t("only", "만 보기")}</button>
+              </span>
+            ))}
+          </div>
+        </div>)}
+        {!isNew && <Toggle size="sm" className={`${pill} mt-2`} pressed={!!st?.ofz} onPressedChange={(v) => set({ ofz: v })}>{t("OFZ (inner surfaces)", "OFZ (내측 표면)")}</Toggle>}
+        <Note>{isNew
+          ? t("ICAO Annex 14 Amendment 18 (applicable 21 Nov 2030), aeroplane design group by the airport's code. OFS: no new objects; OES: obstacles are evaluated against the operations. Precision ends = runways with an ILS procedure; OFS transitional at the 20 % maximum slope.", "ICAO Annex 14 개정 18 (2030.11.21 시행). 항공기 설계그룹(ADG)은 공항 코드로 정했습니다. OFS는 신규 장애물 금지, OES는 운항 영향 평가 대상입니다. 정밀접근 = ILS 절차가 있는 활주로, OFS 전이표면은 최대 경사 20 %로 그렸습니다.")
+          : t(`ICAO Annex 14 Vol. I Tab. 4-1 / 4-2, code ${ap?.code ?? 4}. Combined OLS = the lowest surface of the included runways.`, `ICAO Annex 14 Vol. I 표 4-1 / 4-2, 코드 ${ap?.code ?? 4}. 통합 OLS = 선택한 활주로들의 표면 중 가장 낮은 표면.`)}</Note>
 
           </>}
 
@@ -332,7 +346,6 @@ export function Simulator({ onHome }: { onHome: () => void }) {
         <div className="flex flex-wrap gap-1.5">
           <Toggle size="sm" className={pill} pressed={!!st?.obs} onPressedChange={(v) => set({ obs: v })}><span className="size-1.5 rounded-full bg-[#e0443e]" />{t("Buildings through them", "표면 침투 건물")}</Toggle>
           <Toggle size="sm" className={pill} pressed={!!st?.pen} onPressedChange={(v) => set({ pen: v })}><span className="size-1.5 rounded-full bg-[#c64545]" />{t("Terrain through them", "표면 침투 지형")}</Toggle>
-          <Toggle size="sm" className={pill} pressed={!!st?.ofz} onPressedChange={(v) => set({ ofz: v })}>{t("OFZ (inner surfaces)", "OFZ (내측 표면)")}</Toggle>
         </div>
             <div className="mt-4 text-[11px] text-white/45">{t("Through the combined OLS", "통합 OLS 침투")} · {scenName}</div>
             {!stats ? <Note>{t("Computing…", "계산 중…")}</Note> : <div className="mt-2 space-y-2.5 rounded-lg border border-white/10 bg-white/[.03] p-3 text-[11.5px]">
