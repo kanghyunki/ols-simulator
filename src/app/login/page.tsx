@@ -7,7 +7,9 @@ import { supabase, SUPABASE_URL, SUPABASE_KEY } from "@/lib/supabase";
 import { useT } from "@/lib/lang";
 
 // Log in: email first, then the password (Supabase Auth, the accounts made on /signup). Google goes through Supabase
-// OAuth, which works once the Google provider is switched on in the Supabase dashboard.
+// OAuth, which works once the Google provider is switched on in the Supabase dashboard; a Google account without an OLS
+// account is signed up on its first sign-in. ?next=#ICN (from Explore or an airport link) opens the simulator once signed in.
+const nextUrl = () => { const n = new URLSearchParams(location.search).get("next"); return n && /^#[A-Z0-9]+$/.test(n) ? "/" + n : null; };
 const field = "h-12 w-full rounded-md border border-white/12 bg-white/[.04] px-4 text-[16px] text-white placeholder:text-white/35 outline-none transition focus:border-[#4f7dff] focus:bg-white/[.06]";
 
 export default function Login() {
@@ -15,6 +17,7 @@ export default function Login() {
   const [email, setEmail] = useState(""), [pw, setPw] = useState(""), [step, setStep] = useState<"email" | "password">("email");
   const [busy, setBusy] = useState(false), [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null), [who, setWho] = useState<string | null>(null);
   useEffect(() => { supabase.auth.getSession().then(({ data }) => setWho(data.session?.user.email ?? null)); }, []);
+  useEffect(() => { const n = nextUrl(); if (who && n) location.replace(n); }, [who]);   // signed in (password or back from Google): on to the simulator
   const okEmail = /^\S+@\S+\.\S+$/.test(email.trim());
 
   const submit = async (e: React.FormEvent) => {
@@ -31,7 +34,7 @@ export default function Login() {
     // OAuth redirects straight to Supabase, which shows a raw error page if Google is off — check its public settings first
     const on = await fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY } }).then((r) => r.json()).then((s) => !!s.external?.google).catch(() => false);
     if (!on) { setMsg({ ok: false, text: t("Google sign-in is not available yet. Please continue with email.", "Google 로그인은 아직 준비 중입니다. 이메일로 계속해 주세요.") }); return; }
-    await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${location.origin}/login` } });
+    await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${location.origin}/login${location.search}` } });
   };
 
   return (
@@ -72,6 +75,7 @@ export default function Login() {
               <svg viewBox="0 0 48 48" className="size-5" aria-hidden><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" /><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" /><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z" /><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" /></svg>
               {t("Continue with Google", "Google로 계속")}
             </button>
+            <p className="mt-3 text-center text-[12.5px] leading-relaxed text-white/45">{t("No account yet? Google signs you up on the first sign-in, and you agree to the collection and use of your name and email for the service.", "계정이 없으면 Google 로그인으로 바로 가입됩니다. 이 경우 서비스 이용을 위한 이름·이메일 수집과 이용에 동의하는 것으로 봅니다.")}</p>
           </>
         )}
         </Reveal>

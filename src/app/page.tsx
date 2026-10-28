@@ -6,11 +6,15 @@ import { SiteNav } from "@/components/site-nav";
 import { Landing, type FanMode } from "@/components/landing";
 import { Simulator } from "@/components/simulator";
 import { useT } from "@/lib/lang";
+import { supabase } from "@/lib/supabase";
 
 // landing → (Explore) leaving: the fan spools up and the camera flies into the hub → app: the simulator mounts
 // (after the fly-in, so its first heavy build does not stutter the animation) and the landing fades out over it.
 // app → (Home) returning: the landing fades back in from inside the hub and pulls out → landing: the simulator unmounts.
-// A link with an airport hash (#ICN) skips straight to the simulator.
+// A link with an airport hash (#ICN) skips straight to the simulator. The simulator is for members: without a session,
+// Explore and airport links go to /login, which comes back here (?next) once signed in or signed up with Google.
+const signedIn = () => supabase.auth.getSession().then(({ data }) => !!data.session).catch(() => false);
+const toLogin = (next: string) => location.assign(`/login?next=${encodeURIComponent(next)}`);
 type Phase = "init" | "landing" | "leaving" | "app" | "returning";
 const FAN: Record<Phase, FanMode> = { init: "idle", landing: "idle", leaving: "leave", app: "leave", returning: "enter" };
 
@@ -37,7 +41,9 @@ export default function Page() {
   const [phase, setPhase] = useState<Phase>("init");
   const t = useT();
   const [gone, setGone] = useState(false);   // landing fully faded → unmount it
-  useEffect(() => { setPhase(location.hash ? "app" : "landing"); }, []);
+  useEffect(() => { const h = location.hash; if (!h) { setPhase("landing"); return; }
+    signedIn().then((ok) => (ok ? setPhase("app") : toLogin(h))); }, []);
+  const explore = () => signedIn().then((ok) => (ok ? setPhase("leaving") : toLogin("#ICN")));
   useEffect(() => { if (phase !== "app") return; const t = setTimeout(() => setGone(true), 900); return () => clearTimeout(t); }, [phase]);
   const home = () => { history.replaceState(null, "", location.pathname); setGone(false); setPhase("returning"); };
 
@@ -64,7 +70,7 @@ export default function Page() {
                   {t("Obstacle limitation surfaces over real terrain and buildings, runway scenarios and instrument procedures.", "실제 지형과 건물 위에 장애물제한표면을 띄우고, 활주로 시나리오와 계기비행절차까지 한 화면에서 확인합니다.")}
                 </p>
                 <button
-                  onClick={() => setPhase("leaving")}
+                  onClick={explore}
                   disabled={moving}
                   className="pointer-events-auto mt-8 inline-flex h-11 items-center gap-2 rounded-md bg-[#3f6bff] px-5 text-[15px] font-medium text-white transition hover:bg-[#5a80ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white max-md:mt-6"
                 >
