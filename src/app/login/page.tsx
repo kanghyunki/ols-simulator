@@ -67,6 +67,7 @@ export default function Login() {
                 className="mt-5 h-12 w-full rounded-md bg-[#3f6bff] text-[15px] font-medium text-white transition hover:bg-[#5a80ff] disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/35">
                 {step === "email" ? t("Continue with email", "이메일로 계속") : busy ? t("Logging in…", "로그인 중…") : t("Log in", "로그인")}
               </button>
+              <Link href="/reset" className="mt-4 block text-center text-[14px] text-white/55 underline-offset-4 transition hover:text-white hover:underline">{t("Forgot your password?", "비밀번호를 잊으셨나요?")}</Link>
             </form>
 
             <div className="my-7 flex w-full items-center gap-4 font-mono text-[12px] tracking-[0.14em] text-white/40"><span className="h-px flex-1 bg-white/12" />{t("OR", "또는")}<span className="h-px flex-1 bg-white/12" /></div>
