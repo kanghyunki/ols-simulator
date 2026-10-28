@@ -6,13 +6,16 @@ import { createPortal } from "react-dom";
 import { Logo } from "@/components/logo";
 import { LangButton } from "@/components/lang-button";
 import { useT } from "@/lib/lang";
+import { Avatar } from "@/components/avatar";
+import { profileOf, supabase, useSession } from "@/lib/supabase";
 
 // The landing page's top bar, shared by every page so it stays put while moving between them; the current page is lit.
-// On phones the items move into a drawer that slides in from the left (☰ at the top left).
+// On phones the items move into a drawer that slides in from the left (☰ at the top left). Signed in, Sign up / Log in
+// give way to the member's round profile picture, which opens My page.
 const ITEMS: [string, string, string][] = [["Product", "제품", "/product"], ["Project", "프로젝트", "/project"], ["About", "소개", "/about"], ["Contact", "문의", "/contact"]];
 
 export function SiteNav() {
-  const path = usePathname(), t = useT();
+  const path = usePathname(), t = useT(), session = useSession(), me = session ? profileOf(session) : null;
   const [open, setOpen] = useState(false), [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   useEffect(() => {
@@ -41,8 +44,13 @@ export function SiteNav() {
           ))}
         </ul>
         <div className="mt-auto space-y-3 border-t border-white/10 pt-5">
-          <Link href="/signup" onClick={close} className="flex h-11 items-center justify-center rounded-md border border-white/15 text-[15px] text-white/90 transition hover:bg-white/[.06]">{t("Sign up", "회원가입")}</Link>
-          <Link href="/login" onClick={close} className="flex h-11 items-center justify-center rounded-md bg-white text-[15px] font-medium text-[#0b0d10] transition hover:bg-white/85">{t("Log in", "로그인")}</Link>
+          {me ? <>
+            <Link href="/mypage" onClick={close} className="flex items-center gap-3 rounded-md px-3 py-2 transition hover:bg-white/[.06]"><Avatar name={me.name} src={me.avatar} size={32} /><span className="truncate text-[15px] text-white/90">{t("My page", "마이페이지")}</span></Link>
+            <button type="button" onClick={() => { close(); supabase.auth.signOut(); }} className="flex h-11 w-full items-center justify-center rounded-md border border-white/15 text-[15px] text-white/90 transition hover:bg-white/[.06]">{t("Log out", "로그아웃")}</button>
+          </> : <>
+            <Link href="/signup" onClick={close} className="flex h-11 items-center justify-center rounded-md border border-white/15 text-[15px] text-white/90 transition hover:bg-white/[.06]">{t("Sign up", "회원가입")}</Link>
+            <Link href="/login" onClick={close} className="flex h-11 items-center justify-center rounded-md bg-white text-[15px] font-medium text-[#0b0d10] transition hover:bg-white/85">{t("Log in", "로그인")}</Link>
+          </>}
         </div>
       </nav>
     </div>
@@ -60,8 +68,11 @@ export function SiteNav() {
       </nav>
       <div className="ml-auto flex items-center gap-6 text-[15px] max-md:gap-4">
         <LangButton />
-        <Link href="/signup" aria-current={path === "/signup" ? "page" : undefined} className={`transition hover:text-white max-md:hidden ${path === "/signup" ? "text-white" : "text-white/80"}`}>{t("Sign up", "회원가입")}</Link>
-        <Link href="/login" className="flex h-10 items-center rounded-md bg-white px-4 font-medium text-[#0b0d10] transition hover:bg-white/85 max-md:h-9 max-md:px-3 max-md:text-[14px]">{t("Log in", "로그인")}</Link>
+        {me ? <Link href="/mypage" aria-label={t("My page", "마이페이지")} title={me.email} className="rounded-full transition hover:opacity-85"><Avatar name={me.name} src={me.avatar} /></Link>
+          : session === null ? <>
+          <Link href="/signup" aria-current={path === "/signup" ? "page" : undefined} className={`transition hover:text-white max-md:hidden ${path === "/signup" ? "text-white" : "text-white/80"}`}>{t("Sign up", "회원가입")}</Link>
+          <Link href="/login" className="flex h-10 items-center rounded-md bg-white px-4 font-medium text-[#0b0d10] transition hover:bg-white/85 max-md:h-9 max-md:px-3 max-md:text-[14px]">{t("Log in", "로그인")}</Link>
+        </> : <span className="size-9" aria-hidden />}
       </div>
       {mounted && createPortal(drawer, document.body)}
     </header>
