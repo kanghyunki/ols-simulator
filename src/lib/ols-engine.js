@@ -501,8 +501,8 @@ export function createEngine(canvas, cb) {
   const AIR = 875, ROLL = 38, planes = [], planeMat = new Map();
   const finMat = color => { if (!planeMat.has(color)) planeMat.set(color, new THREE.MeshPhongMaterial({ color, shininess: 60, side: THREE.DoubleSide })); return planeMat.get(color); };
   let planeProto = null;
-  function planeModel(color) {   // AIRTRIX B737-800 (plane3d.js, nose +x) turned nose +Z for lookAt, at twice its size: ~70 m span, the line's width
-    if (!planeProto) { planeProto = new THREE.Group(); const m = buildAircraft(B738); m.rotation.y = -Math.PI / 2; m.scale.setScalar(2); planeProto.add(m); }
+  function planeModel(color) {   // AIRTRIX B737-800 (plane3d.js, nose +x) turned nose +Z for lookAt, at 4× its size (~143 m span) so it reads at airport scale
+    if (!planeProto) { planeProto = new THREE.Group(); const m = buildAircraft(B738); m.rotation.y = -Math.PI / 2; m.scale.setScalar(4); planeProto.add(m); }
     const g = planeProto.clone(); g.userData.fin = g.getObjectByName('fin'); g.userData.fin.material = finMat(color); return g; }
   // nodes: [x, metres AMSL, z, speed m/s, ground?]; the segment time uses the mean of its end speeds
   function track(nodes) { const t = [0];
@@ -538,8 +538,7 @@ export function createEngine(canvas, cb) {
     function fly(seq, off) { const n = Math.ceil(Math.max(...seq.map(q => q.tr.T)) / Math.min(...seq.map(q => q.gap))) + 1;
       const pool = Array.from({ length: n }, () => { const o = planeModel(seq[0].color); add(o, scene); return o; }); planes.push({ pool, seq, off }); } }
   const _a = new THREE.Vector3(), _b = new THREE.Vector3();
-  // Line-sized up close, growing with the camera distance (span ≈ 5 % of it) so it stays visible from the overview.
-  // While small it rides just above the path line; larger, it flies on the line. On the ground it sits on its wheels.
+  // A fixed 4× the true size (AIRTRIX dimensions) at every zoom: rides on top of the path line, on the ground it sits on its wheels.
   function flyPlanes(now) { if (!planes.length) return; const zex = G.scale.y;
     for (const p of planes) { const cycle = p.seq.reduce((n, q) => n + q.gap, 0), t0 = (now / 1000 + p.off) % cycle;
       const live = [];                                     // launches still in the air: this cycle's and earlier cycles'
@@ -552,8 +551,8 @@ export function createEngine(canvas, cb) {
       let i = 1; while (i < t.length - 1 && t[i] < tt) i++;
       const f = Math.min(1, (tt - t[i - 1]) / (t[i] - t[i - 1] || 1)), a = nodes[i - 1], b = nodes[i];
       _a.set(a[0], a[1] * zex, a[2]); _b.set(b[0], b[1] * zex, b[2]); o.position.lerpVectors(_a, _b, f);
-      const k = Math.max(1, 0.05 * camera.position.distanceTo(o.position) / 70), lift = (n) => (n[4] ? 0 : Math.max(0, 9 * zex + 5 - 4 * k));
-      o.scale.setScalar(k); o.position.y += lift(a) + (lift(b) - lift(a)) * f; _b.y += lift(b);
+      const lift = (n) => (n[4] ? 0 : 9 * zex);   // true size; airborne it rides on top of the path line
+      o.position.y += lift(a) + (lift(b) - lift(a)) * f; _b.y += lift(b);
       if (o.position.distanceToSquared(_b) > 1) o.lookAt(_b); }
 
   // ---------- noise (Lden) ----------
@@ -620,12 +619,12 @@ export function createEngine(canvas, cb) {
       const prof = ANP[ac][tr.mode === 'A' ? 'app' : 'dep'].map(q => [q[0] * FT, q[1] * FT]);
       const s0 = tr.mode === 'A' ? -12000 : 0, s1 = tr.mode === 'A' ? 0 : 12000;
       const sh = Array.from({ length: 4 }, () => { const m = new THREE.Mesh(WV.geo, waveMat()); m.visible = false; m.renderOrder = 2; scene.add(m); return { m, t0: -1e9 }; });
-      const dot = (WV.plane || (WV.plane = buildAircraft(B738))).clone(); dot.rotation.y = Math.atan2(tr.uy, tr.ux); scene.add(dot);   // AIRTRIX model, nose along the track
+      const dot = (WV.plane || (WV.plane = buildAircraft(B738))).clone(); dot.scale.setScalar(4); dot.rotation.y = Math.atan2(tr.uy, tr.ux); scene.add(dot);   // AIRTRIX model, nose along the track
       WV.em.push({ tr, prof, s0, s1, sh: sh.map(o => o.m), st: sh, dot, ph: i * 5.6, k: 0, next: 0 }); }); }
   const profH = (prof, s) => { for (let i = 1; i < prof.length; i++) if (s <= prof[i][0] || i === prof.length - 1) { const [x1, h1] = prof[i - 1], [x2, h2] = prof[i]; return Math.max(0, h1 + (h2 - h1) * Math.min(1, Math.max(0, (s - x1) / ((x2 - x1) || 1)))); } return 0; };
   function waves(now) { if (!WV.em.length) return; const t = now / 1000, zex = G.scale.y, B = noiseBands(), g = NZ.grid, L0 = B[state.noiseFrom || 0][0], LIFE = 7, GAP = LIFE / 4;   // slow, sparse rings: about 7 s from source to the outer contour
     for (const e of WV.em) { const { tr } = e, f = ((t + e.ph) % 45) / 45, s = e.s0 + (e.s1 - e.s0) * f, x = tr.x + tr.ux * s, y = tr.y + tr.uy * s, H = profH(e.prof, s);   // true scale (not exaggerated), so a shell meets the ground where the sound does
-      e.dot.position.set(x, state.E * zex + H, -y); e.dot.rotation.z = H > 1 ? (tr.mode === 'A' ? 2 : 10) * Math.PI / 180 : 0; e.dot.scale.setScalar(Math.max(1, camera.position.distanceTo(e.dot.position) / 1000));   // pitch: approach / climb; enlarged when far, so it reads
+      e.dot.position.set(x, state.E * zex + H, -y); e.dot.rotation.z = H > 1 ? (tr.mode === 'A' ? 2 : 10) * Math.PI / 180 : 0;    // pitch: approach / climb; 4× size like the procedure aircraft
       if (t >= e.next) { e.next = t + GAP; let R = 0; for (let r = 100; r <= 8000; r += 100) { if (lnAt(g, x - tr.uy * r, y + tr.ux * r) < L0 && lnAt(g, x + tr.uy * r, y - tr.ux * r) < L0) break; R = r; }
         const o = e.st[e.k++ % e.st.length]; Object.assign(o, { t0: t, x, y, H: state.E * zex + H, h: H, R: Math.hypot(R, H), on: R > 0 }); }
       for (const o of e.st) { const a = (t - o.t0) / LIFE, m = o.m; m.visible = o.on && a >= 0 && a < 1; if (!m.visible) continue;
