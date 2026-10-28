@@ -5,7 +5,8 @@ import { SiteNav } from "@/components/site-nav";
 import { supabase } from "@/lib/supabase";
 import { useT } from "@/lib/lang";
 
-// Forgotten password, in three steps: the account's email → the 6–8 digit code (the project's Email OTP Length) from the recovery email (the Supabase
+const CODE_LEN = 6;   // = the project's Email OTP Length (Authentication → Providers → Email)
+// Forgotten password, in three steps: the account's email → the 6-digit code from the recovery email (the Supabase
 // "Reset password" template shows {{ .Token }}) → a new password, after which the member is signed in.
 // Supabase answers the first step the same way whether or not the email has an account, so nothing is revealed here.
 const field = "h-12 w-full rounded-md border border-white/12 bg-white/[.04] px-4 text-[16px] text-white placeholder:text-white/35 outline-none transition focus:border-[#4f7dff] focus:bg-white/[.06]";
@@ -22,7 +23,7 @@ export default function Reset() {
   const t = useT();
   const [step, setStep] = useState<"email" | "code" | "password" | "done">("email");
   const [email, setEmail] = useState(""), [code, setCode] = useState(""), [pw, setPw] = useState(""), [pw2, setPw2] = useState("");
-  const [busy, setBusy] = useState(false), [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false), [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null), [focus, setFocus] = useState(false);
   const fail = (e: { code?: string } | null, fallback: [string, string]) => { const m = (e?.code && ERRORS[e.code]) || fallback; setMsg({ ok: false, text: t(m[0], m[1]) }); };
   const okEmail = /^\S+@\S+\.\S+$/.test(email.trim());
 
@@ -48,7 +49,7 @@ export default function Reset() {
     if (error) return fail(error, ["We could not change the password. Please try again.", "비밀번호를 바꾸지 못했습니다. 다시 시도해 주세요."]);
     setStep("done");
   };
-  const ready = step === "email" ? okEmail : step === "code" ? /^\d{6,8}$/.test(code) : pw.length >= 8 && pw === pw2;
+  const ready = step === "email" ? okEmail : step === "code" ? code.length === CODE_LEN : pw.length >= 8 && pw === pw2;
 
   return (
     <div className="fixed inset-0 overflow-y-auto bg-[#050608] text-white">
@@ -74,8 +75,16 @@ export default function Reset() {
             </>}
             {step === "code" && <>
               <label htmlFor="code" className="mb-2 block text-[14px] font-medium text-white/85">{t("Code from the email", "메일로 받은 인증번호")} <span className="font-normal text-white/45">· {email.trim()}</span></label>
-              <input id="code" inputMode="numeric" autoComplete="one-time-code" autoFocus maxLength={8} placeholder="000000" value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 8))} className={`${field} text-center font-mono text-[24px] tracking-[0.5em]`} />
+              {/* six boxes drawn over one transparent input, so typing, backspace, paste and SMS/email autofill all just work */}
+              <div className="relative">
+                <input id="code" inputMode="numeric" autoComplete="one-time-code" autoFocus maxLength={CODE_LEN} value={code} aria-label={t("Code", "인증번호")}
+                  onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, CODE_LEN))} className="absolute inset-0 z-10 w-full cursor-text text-transparent caret-transparent opacity-0" />
+                <div className="flex justify-between gap-2" aria-hidden>
+                  {Array.from({ length: CODE_LEN }, (_, i) => { const on = focus && (i === code.length || (i === CODE_LEN - 1 && code.length === CODE_LEN));
+                    return <span key={i} className={`grid h-14 flex-1 place-items-center rounded-lg border bg-white/[.04] font-mono text-[24px] text-white transition ${on ? "border-[#4f7dff] bg-white/[.07]" : code[i] ? "border-white/25" : "border-white/12"}`}>{code[i] ?? ""}</span>; })}
+                </div>
+              </div>
             </>}
             {step === "password" && <>
               <label htmlFor="pw" className="mb-2 block text-[14px] font-medium text-white/85">{t("New password", "새 비밀번호")}</label>
