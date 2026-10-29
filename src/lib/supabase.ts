@@ -10,7 +10,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // compile this to false, so the deployed site always asks for a real sign-in.
 export const DEV = process.env.NODE_ENV === "development";
 const DEMO = { access_token: "", refresh_token: "", expires_in: 0, token_type: "bearer",
-  user: { id: "dev-demo", email: "demo@localhost", app_metadata: { provider: "email", plan: "ultra", lifetime: true }, user_metadata: { name: "Demo Member" }, aud: "authenticated", created_at: "2026-01-01T00:00:00Z", last_sign_in_at: new Date().toISOString() } } as unknown as Session;
+  user: { id: "dev-demo", email: "demo@localhost", app_metadata: { provider: "email", plan: "ultra", free_until: "2027-10-28" }, user_metadata: { name: "Demo Member" }, aud: "authenticated", created_at: "2026-01-01T00:00:00Z", last_sign_in_at: new Date().toISOString() } } as unknown as Session;
 
 // The signed-in session, kept current across sign-in and sign-out: undefined while it is being read, null when signed out
 export function useSession() {

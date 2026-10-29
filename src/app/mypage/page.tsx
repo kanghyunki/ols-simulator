@@ -44,14 +44,15 @@ export default function MyPage() {
   useEffect(() => { const read = () => { const h = location.hash.slice(1); setSec(h === "plan" || h === "billing" || h === "team" ? h : "details"); };
     read(); addEventListener("hashchange", read); return () => removeEventListener("hashchange", read); }, []);
   useEffect(() => { if (session === null) location.replace("/login"); }, [session]);
-  const [fresh, setFresh] = useState<{ plan: Plan; lifetime: boolean } | null>(null);   // plan read from the server (the session token can be an hour old)
+  const [fresh, setFresh] = useState<{ plan: Plan; until: string | null } | null>(null);   // plan read from the server (the session token can be an hour old)
   useEffect(() => { if (!session) return;
-    supabase.auth.getUser().then(({ data }) => data.user && setFresh({ plan: data.user.app_metadata?.plan ?? "free", lifetime: !!data.user.app_metadata?.lifetime }));
+    supabase.auth.getUser().then(({ data }) => data.user && setFresh({ plan: data.user.app_metadata?.plan ?? "free", until: data.user.app_metadata?.free_until ?? null }));
     supabase.from("ols_members").select("name, phone_country, phone_code, phone, birth_date").eq("id", session.user.id).maybeSingle().then(({ data }) => setM(data)); }, [session]);
   if (!session) return <div className="fixed inset-0 bg-[#050608]" />;
   const me = profileOf(session), u = session.user, google = u.app_metadata?.provider === "google";
-  // lifetime: founding members keep their plan free for good (app_metadata.lifetime)
-  const plan: Plan = fresh?.plan ?? u.app_metadata?.plan ?? "free", lifetime = fresh?.lifetime ?? !!u.app_metadata?.lifetime, tier = TIERS.find((x) => x[0] === plan) ?? TIERS[0];
+  // app_metadata.free_until (YYYY-MM-DD, last free day): a member given the plan free for a while; only that member sees it
+  const plan: Plan = fresh?.plan ?? u.app_metadata?.plan ?? "free", until: string | null = fresh ? fresh.until : u.app_metadata?.free_until ?? null;
+  const promo = !!until && new Date().toLocaleDateString("sv") <= until, upto = until?.replaceAll("-", ".") ?? "", tier = TIERS.find((x) => x[0] === plan) ?? TIERS[0];
   const won = (n: number) => n.toLocaleString("en");
 
   const save = async () => { if (!edit) return; setBusy(true); setMsg(null);
@@ -87,7 +88,7 @@ export default function MyPage() {
           <h1 className="text-[30px] font-semibold tracking-[-0.01em] text-[#f3eee6]">{t("Your details", "내 정보")}</h1>
           <div className="mt-5 flex items-center gap-5">
             <Avatar name={me.name} src={me.avatar} size={64} />
-            <div><div className="flex items-center gap-2.5 text-[17px] text-white">{(m?.name ?? me.name) || me.email}<PlanBadge plan={plan} />{lifetime && <span className="text-[12.5px] text-white/55">{t("Lifetime free member", "평생 무료 회원")}</span>}</div><div className="text-[13.5px] text-white/50">{google ? t("Photo from your Google account", "Google 계정 사진") : me.email}</div></div>
+            <div><div className="flex items-center gap-2.5 text-[17px] text-white">{(m?.name ?? me.name) || me.email}<PlanBadge plan={plan} />{promo && <span className="text-[12.5px] text-white/55">{t(`Free for a year · until ${upto}`, `1년 무료 · ${upto}까지`)}</span>}</div><div className="text-[13.5px] text-white/50">{google ? t("Photo from your Google account", "Google 계정 사진") : me.email}</div></div>
           </div>
 
           {/* personal information */}
@@ -142,8 +143,8 @@ export default function MyPage() {
           <h1 className="text-[30px] font-semibold tracking-[-0.01em] text-[#f3eee6]">{t("Subscription", "구독 요금제")}</h1>
           {head(t("Current plan", "현재 요금제"))}
           <div className={`mt-3 ${card} flex items-center justify-between gap-4 max-md:flex-col max-md:items-start`}>
-            <div><div className="flex items-center gap-3 text-[18px] font-semibold"><PlanBadge plan={plan} /><span>{lifetime ? t("Lifetime free", "평생 무료") : tier[2] ? t(`KRW ${won(tier[2])} / month`, `월 ${won(tier[2])}원`) : t("Free", "무료")}</span></div>
-              <div className="mt-1.5 text-[14px] text-white/55">{lifetime ? t(`A lifetime free member: every ${tier[1]} feature, with no charge now or after launch.`, `평생 무료 회원입니다. ${tier[1]} 요금제의 모든 기능을 정식 출시 후에도 비용 없이 쓰실 수 있습니다.`)
+            <div><div className="flex items-center gap-3 text-[18px] font-semibold"><PlanBadge plan={plan} /><span>{promo ? t(`Free until ${upto}`, `${upto}까지 무료`) : tier[2] ? t(`KRW ${won(tier[2])} / month`, `월 ${won(tier[2])}원`) : t("Free", "무료")}</span></div>
+              <div className="mt-1.5 text-[14px] text-white/55">{promo ? t(`One year free: every ${tier[1]} feature at no charge until ${upto}.`, `1년 무료 회원입니다. ${upto}까지 ${tier[1]} 요금제의 모든 기능을 비용 없이 쓰실 수 있습니다.`)
                 : t("Every feature is open during the beta. Billing starts with the official launch.", "베타 기간에는 모든 기능을 무료로 쓰실 수 있습니다. 결제는 정식 출시와 함께 시작합니다.")}</div></div>
             {ask(t("Talk to us about a plan", "요금제 상담"))}
           </div>
@@ -155,7 +156,7 @@ export default function MyPage() {
                 return <div key={k} className={`flex flex-col items-center px-4 pt-7 pb-6 text-center ${i ? "border-l border-white/[.07]" : ""} ${on ? "bg-white/[.03]" : ""}`}>
                   <div className={`text-[22px] font-semibold ${k === "ultra" ? "bg-clip-text text-transparent" : ""}`} style={k === "ultra" ? { backgroundImage: RAINBOW } : undefined}>{name}</div>
                   <div className="mt-3 text-[22px] font-semibold text-[#f3eee6]">{won(price)}<span className="ml-1 text-[14px] font-normal text-white/45">{t("KRW / mo", "원 / 월")}</span></div>
-                  {on ? <span className="mt-5 inline-flex h-9 items-center rounded-full border border-white/25 px-5 whitespace-nowrap text-[13.5px] text-white/70">{lifetime ? t("Lifetime free", "평생 무료") : t("Current plan", "현재 요금제")}</span>
+                  {on ? <span className="mt-5 inline-flex h-9 items-center rounded-full border border-white/25 px-5 whitespace-nowrap text-[13.5px] text-white/70">{promo ? t("1 year free", "1년 무료") : t("Current plan", "현재 요금제")}</span>
                     : <Link href="/contact" className={`mt-5 inline-flex h-9 items-center rounded-full px-5 text-[13.5px] font-medium text-white transition ${k === "free" ? "border border-white/25 hover:bg-white/[.07]" : "bg-[#3f6bff] hover:bg-[#5a80ff]"}`} style={k === "ultra" ? { backgroundImage: RAINBOW } : undefined}>{t("Get started", "시작하기")}</Link>}
                   {FEATURES.map(([en, ko, v]) => { const x = v[i];
                     return <div key={en} className="mt-6 w-full">
