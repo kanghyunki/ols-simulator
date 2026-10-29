@@ -11,13 +11,26 @@ import { useT } from "@/lib/lang";
 // "View details") and the account. Email members' details come from public.ols_members (row-level
 // security: read / update own row) and can be edited here; Google members have no row, so their card shows the Google profile.
 type Sec = "details" | "plan" | "billing" | "team";
-// Plans as in the business plan (annual, VAT excluded); there is no online payment yet, so upgrades go through /contact
-const PLANS: [string, string, string, string, string, string][] = [
-  ["Pro", "Pro", "Engineers and consultants", "설계사 · 컨설팅", "KRW 9,000,000 / seat / yr", "연 900만 원 / 계정"],
-  ["Institution", "기관 라이선스", "Airport operators, aviation authorities, defence", "공항공사 · 지방항공청 · 국방부", "KRW 30–60 M / yr", "연 3,000~6,000만 원"],
-  ["Local government", "지자체", "Height limits and noise complaints around airports", "공항 주변 지자체 · 고도제한 · 소음 민원", "KRW 12,000,000 / yr", "연 1,200만 원"],
-  ["Project", "프로젝트 라이선스", "ADB and World Bank projects", "ADB · 세계은행 사업", "USD 15,000 / project / yr", "연 1.5만 달러 / 프로젝트"],
+// Monthly plans (VAT included); the member's plan is app_metadata.plan (set by us, members cannot change it), Free when unset.
+// There is no online payment yet, so upgrades go through /contact
+type Plan = "free" | "plus" | "pro" | "ultra";
+const TIERS: [Plan, string, number][] = [["free", "Free", 0], ["plus", "Plus", 11000], ["pro", "Pro", 29000], ["ultra", "Ultra", 119000]];
+// feature rows: [en, ko, value per tier — true / false / [en, ko]]
+const FEATURES: [string, string, (boolean | [string, string])[]][] = [
+  ["Airports", "공항", [["3 airports", "3개"], ["10 airports", "10개"], ["All 38 airports", "전체 38개"], ["All + new on request", "전체 + 신규 요청"]]],
+  ["Obstacle limitation surfaces in 3D (view)", "장애물제한표면 3D 보기", [true, true, true, true]],
+  ["Runway extension · parallel runways (OLS review)", "활주로 연장 · 평행활주로 검토", [false, true, true, true]],
+  ["Flight procedures · noise (view)", "비행절차 · 소음영향 보기", [false, false, true, true]],
+  ["Flight procedures · noise (your own review)", "비행절차 · 소음영향 직접 검토", [false, false, false, true]],
 ];
+const RAINBOW = "linear-gradient(90deg,#ff5f6d,#ffc371,#5ee7a0,#4fa8ff,#a46bff,#ff6fd8)";
+// plan chip; Ultra in rainbow
+function PlanBadge({ plan }: { plan: Plan }) {
+  const name = TIERS.find((x) => x[0] === plan)?.[1] ?? "Free";
+  return plan === "ultra"
+    ? <span className="inline-flex rounded-full p-px" style={{ background: RAINBOW }}><span className="rounded-full bg-[#050608] px-2.5 py-0.5 text-[12.5px] font-semibold"><span className="bg-clip-text text-transparent" style={{ backgroundImage: RAINBOW }}>{name}</span></span></span>
+    : <span className="rounded-full border border-white/20 px-2.5 py-0.5 text-[12.5px] text-white/70">{name}</span>;
+}
 type Member = { name: string | null; phone_country: string | null; phone_code: string | null; phone: string | null; birth_date: string | null };
 const day = (iso?: string | null) => (iso ? iso.slice(0, 10) : "—");
 const MASK = "*****";
@@ -31,10 +44,15 @@ export default function MyPage() {
   useEffect(() => { const read = () => { const h = location.hash.slice(1); setSec(h === "plan" || h === "billing" || h === "team" ? h : "details"); };
     read(); addEventListener("hashchange", read); return () => removeEventListener("hashchange", read); }, []);
   useEffect(() => { if (session === null) location.replace("/login"); }, [session]);
+  const [fresh, setFresh] = useState<{ plan: Plan; lifetime: boolean } | null>(null);   // plan read from the server (the session token can be an hour old)
   useEffect(() => { if (!session) return;
+    supabase.auth.getUser().then(({ data }) => data.user && setFresh({ plan: data.user.app_metadata?.plan ?? "free", lifetime: !!data.user.app_metadata?.lifetime }));
     supabase.from("ols_members").select("name, phone_country, phone_code, phone, birth_date").eq("id", session.user.id).maybeSingle().then(({ data }) => setM(data)); }, [session]);
   if (!session) return <div className="fixed inset-0 bg-[#050608]" />;
   const me = profileOf(session), u = session.user, google = u.app_metadata?.provider === "google";
+  // lifetime: founding members keep their plan free for good (app_metadata.lifetime)
+  const plan: Plan = fresh?.plan ?? u.app_metadata?.plan ?? "free", lifetime = fresh?.lifetime ?? !!u.app_metadata?.lifetime, tier = TIERS.find((x) => x[0] === plan) ?? TIERS[0];
+  const won = (n: number) => n.toLocaleString("en");
 
   const save = async () => { if (!edit) return; setBusy(true); setMsg(null);
     const { error } = await supabase.from("ols_members").update({ name: edit.name?.trim() || null, phone: edit.phone?.replace(/\D/g, "") || null, birth_date: edit.birth_date || null }).eq("id", u.id);
@@ -48,7 +66,7 @@ export default function MyPage() {
   const side: [string, string, string][] = [["Home", "홈", "/"], ["My details", "내 정보", "#details"], ["Subscription", "구독 요금제", "#plan"], ["Billing", "결제", "#billing"], ["Team", "팀원", "#team"]];
   const empty = (text: string) => <p className="py-6 text-center text-[14.5px] text-white/45">{text}</p>;
   const head = (title: string, right?: React.ReactNode) => <div className="mt-10 flex items-center justify-between gap-3 first:mt-0"><h2 className="text-[19px] font-semibold">{title}</h2>{right}</div>;
-  const ask = (label: string) => <Link href="/contact" className={`${pillBtn} inline-flex items-center`}>{label}</Link>;
+  const ask = (label: string) => <Link href="/contact" className={`${pillBtn} inline-flex shrink-0 items-center whitespace-nowrap`}>{label}</Link>;
 
   return (
     <div className="fixed inset-0 overflow-y-auto bg-[#050608] text-white">
@@ -69,7 +87,7 @@ export default function MyPage() {
           <h1 className="text-[30px] font-semibold tracking-[-0.01em] text-[#f3eee6]">{t("Your details", "내 정보")}</h1>
           <div className="mt-5 flex items-center gap-5">
             <Avatar name={me.name} src={me.avatar} size={64} />
-            <div><div className="text-[17px] text-white">{(m?.name ?? me.name) || me.email}</div><div className="text-[13.5px] text-white/50">{google ? t("Photo from your Google account", "Google 계정 사진") : me.email}</div></div>
+            <div><div className="flex items-center gap-2.5 text-[17px] text-white">{(m?.name ?? me.name) || me.email}<PlanBadge plan={plan} />{lifetime && <span className="text-[12.5px] text-white/55">{t("Lifetime free member", "평생 무료 회원")}</span>}</div><div className="text-[13.5px] text-white/50">{google ? t("Photo from your Google account", "Google 계정 사진") : me.email}</div></div>
           </div>
 
           {/* personal information */}
@@ -124,18 +142,33 @@ export default function MyPage() {
           <h1 className="text-[30px] font-semibold tracking-[-0.01em] text-[#f3eee6]">{t("Subscription", "구독 요금제")}</h1>
           {head(t("Current plan", "현재 요금제"))}
           <div className={`mt-3 ${card} flex items-center justify-between gap-4 max-md:flex-col max-md:items-start`}>
-            <div><div className="text-[18px] font-semibold">{t("Beta (free)", "베타 (무료)")}</div><div className="mt-1 text-[14px] text-white/55">{t("Every feature is open during the beta. Paid plans start with the official launch.", "베타 기간에는 모든 기능을 무료로 쓰실 수 있습니다. 유료 요금제는 정식 출시와 함께 시작합니다.")}</div></div>
+            <div><div className="flex items-center gap-3 text-[18px] font-semibold"><PlanBadge plan={plan} /><span>{lifetime ? t("Lifetime free", "평생 무료") : tier[2] ? t(`KRW ${won(tier[2])} / month`, `월 ${won(tier[2])}원`) : t("Free", "무료")}</span></div>
+              <div className="mt-1.5 text-[14px] text-white/55">{lifetime ? t(`A lifetime free member: every ${tier[1]} feature, with no charge now or after launch.`, `평생 무료 회원입니다. ${tier[1]} 요금제의 모든 기능을 정식 출시 후에도 비용 없이 쓰실 수 있습니다.`)
+                : t("Every feature is open during the beta. Billing starts with the official launch.", "베타 기간에는 모든 기능을 무료로 쓰실 수 있습니다. 결제는 정식 출시와 함께 시작합니다.")}</div></div>
             {ask(t("Talk to us about a plan", "요금제 상담"))}
           </div>
           {head(t("Plans", "요금제 안내"))}
-          <div className="mt-3 grid grid-cols-2 gap-4 max-md:grid-cols-1">
-            {PLANS.map(([en, ko, wen, wko, pen, pko]) => <div key={en} className={card}>
-              <div className="text-[17px] font-semibold">{t(en, ko)}</div>
-              <div className="mt-1 text-[13.5px] text-white/50">{t(wen, wko)}</div>
-              <div className="mt-4 text-[20px] font-semibold text-[#f3eee6]">{t(pen, pko)}</div>
-            </div>)}
+          {/* plan table: one column per tier, feature rows underneath */}
+          <div className="mt-3 overflow-x-auto rounded-2xl border border-white/12 bg-white/[.02]">
+            <div className="grid min-w-[640px] grid-cols-4">
+              {TIERS.map(([k, name, price], i) => { const on = k === plan;
+                return <div key={k} className={`flex flex-col items-center px-4 pt-7 pb-6 text-center ${i ? "border-l border-white/[.07]" : ""} ${on ? "bg-white/[.03]" : ""}`}>
+                  <div className={`text-[22px] font-semibold ${k === "ultra" ? "bg-clip-text text-transparent" : ""}`} style={k === "ultra" ? { backgroundImage: RAINBOW } : undefined}>{name}</div>
+                  <div className="mt-3 text-[22px] font-semibold text-[#f3eee6]">{won(price)}<span className="ml-1 text-[14px] font-normal text-white/45">{t("KRW / mo", "원 / 월")}</span></div>
+                  {on ? <span className="mt-5 inline-flex h-9 items-center rounded-full border border-white/25 px-5 whitespace-nowrap text-[13.5px] text-white/70">{lifetime ? t("Lifetime free", "평생 무료") : t("Current plan", "현재 요금제")}</span>
+                    : <Link href="/contact" className={`mt-5 inline-flex h-9 items-center rounded-full px-5 text-[13.5px] font-medium text-white transition ${k === "free" ? "border border-white/25 hover:bg-white/[.07]" : "bg-[#3f6bff] hover:bg-[#5a80ff]"}`} style={k === "ultra" ? { backgroundImage: RAINBOW } : undefined}>{t("Get started", "시작하기")}</Link>}
+                  {FEATURES.map(([en, ko, v]) => { const x = v[i];
+                    return <div key={en} className="mt-6 w-full">
+                      <div className="text-[12px] text-white/40">{t(en, ko)}</div>
+                      <div className="mt-1.5 flex h-6 items-center justify-center text-[15px] font-medium text-white/90">
+                        {Array.isArray(x) ? t(x[0], x[1]) : x ? <svg viewBox="0 0 20 20" className="size-5 text-[#3f6bff]" aria-label={t("Included", "포함")}><path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          : <span className="h-[3px] w-5 rounded-full bg-white/20" aria-label={t("Not included", "미포함")} />}
+                      </div>
+                    </div>; })}
+                </div>; })}
+            </div>
           </div>
-          <p className="mt-4 text-[13px] text-white/40">{t("Annual, VAT excluded. Upgrades and quotes are handled by our team for now.", "연간 요금, 부가세 별도. 현재는 요금제 변경과 견적을 담당자가 직접 안내해 드립니다.")}</p>
+          <p className="mt-4 text-[13px] text-white/40">{t("Monthly, VAT included. Institution, local government and project licences are quoted separately; upgrades are handled by our team for now.", "월 요금, 부가세 포함. 기관 · 지자체 · 프로젝트 라이선스는 별도 견적이며, 현재는 요금제 변경을 담당자가 직접 안내해 드립니다.")}</p>
           </>}
 
           {sec === "billing" && <>
