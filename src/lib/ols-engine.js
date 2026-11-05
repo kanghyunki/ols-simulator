@@ -84,7 +84,9 @@ export function createEngine(canvas, cb) {
   // par: added parallel runways [{ ri, off, len }] — a copy of runway `ri` shifted `off` m to its left (A→B; negative = right),
   // centred on the reference (`shift` m along A→B moves that centre), `len` m long (default: the reference length), same threshold elevations
   const state = { showEx: false, extA: [], extB: [], par: [], E: 39, base: 'sat', pen: true, obs: true, ofz: false, rev: 'old', proc: [], bldH: 6,
-    surf: new Set(DEFAULT_KEYS), rot: true, zex: 5, noise: false, noise3d: false, noiseBld: false, noiseCfg: null };   // noiseCfg: overrides of NOISE_TRAFFIC (annual, north, evening, night)   // zex: vertical exaggeration, 5× by default so relief and the surfaces' slopes read at airport scale
+    surf: new Set(DEFAULT_KEYS), rot: true, zex: 5, noise: false, noise3d: false, noiseBld: false, noiseCfg: null,   // noiseCfg: overrides of NOISE_TRAFFIC (annual, north, evening, night)   // zex: vertical exaggeration, 5× by default so relief and the surfaces' slopes read at airport scale
+    // flight procedures: pl = the layers shown, tc = playback (× real time, 0 = paused), gap = s between aircraft on a runway, follow = the camera rides with an aircraft
+    pl: { paths: true, curtain: true, ground: false, wp: true, planes: true, labels: true }, tc: 10, gap: 120, follow: false };
 
   // ---------- coordinates / geometry core (per-runway frames) ----------
   function initAp(ap) { if (!ap._k) { const lat0 = ap.osm.origin[0]; ap._k = [111320 * Math.cos(lat0 * Math.PI / 180), 110574]; }
@@ -536,95 +538,151 @@ export function createEngine(canvas, cb) {
     const rw = frames(scen() !== 'ex')[i], dA = [rw.A[0] - rw.baseA[0], rw.A[1] - rw.baseA[1]], dB = [rw.B[0] - rw.baseB[0], rw.B[1] - rw.baseB[1]];
     return P => { const px = P[0] - rw.baseA[0], py = P[1] - rw.baseA[1], s = px * rw.U[0] + py * rw.U[1], d = px * rw.N[0] + py * rw.N[1];
       if (Math.abs(d) > 150) return P; const m = s < rw.baseL / 2 ? dA : dB; return [P[0] + m[0], P[1] + m[1]]; }; }
+  // Each object carries the layer it belongs to (state.pl): paths, curtain, ground (the track on the terrain), wp (fixes).
   function buildProcs() {
     L.proc.forEach(o => { o.parent.remove(o); o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose(); }); L.proc.length = 0;
-    const procs = (PROCEDURES[APID] || []).filter(p => state.proc.includes(p.id)); if (!procs.length) return;
-    const add = (o, parent = G) => { parent.add(o); L.proc.push(o); }, zex = G.scale.y, seen = new Set();
+    const procs = (PROCEDURES[APID] || []).filter(p => state.proc.includes(p.id)); if (!procs.length) { addPlanes([]); return; }
+    const add = (o, layer, parent = G) => { o.userData.layer = layer; parent.add(o); L.proc.push(o); }, zex = G.scale.y, seen = new Set();
     for (const pr of procs) for (const path of pr.paths) { const mv = procShift(pr);
       const pts = path.legs.map(([, lat, lon, ft], i) => { const P = LL(AP, [lat, lon]), [x, y] = i || path.ma ? mv(P) : P; return new THREE.Vector3(x, ft * 0.3048, -y); });
       const curve = new THREE.CurvePath(); for (let i = 1; i < pts.length; i++) curve.add(new THREE.LineCurve3(pts[i - 1], pts[i]));
-      // a translucent ribbon from the path down to the ground, densest at the path, with a thin bright edge on top
-      const col = new THREE.Color(path.ma ? 0xf5a524 : pr.color);
+      // the path: a tube in the procedure's colour (orange for the missed approach), …
+      const hex = path.ma ? 0xf5a524 : pr.color, col = new THREE.Color(hex), hx = '#' + hex.toString(16).padStart(6, '0');
       add(new THREE.Mesh(new THREE.TubeGeometry(curve, 64 * (pts.length - 1), 9, 6, false),
-        new THREE.MeshBasicMaterial({ color: col.clone().lerp(new THREE.Color(0xffffff), .35), transparent: true, opacity: .9 })));
-      const V = [], H = [], D = [], gz = v => Math.max(0, demAt(v.x, -v.z) ?? 0);
+        new THREE.MeshBasicMaterial({ color: col.clone().lerp(new THREE.Color(0xffffff), .35), transparent: true, opacity: .9 })), 'paths');
+      // … a translucent curtain from the path down to the ground, densest at the path, …
+      const V = [], H = [], D = [], GT = [], gz = v => Math.max(0, demAt(v.x, -v.z) ?? 0);
       for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], ga = gz(a), gb = gz(b);
-        V.push(a.x, a.y, a.z, b.x, b.y, b.z, b.x, gb, b.z, a.x, a.y, a.z, b.x, gb, b.z, a.x, ga, a.z); H.push(1, 1, 0, 1, 0, 0); }
+        V.push(a.x, a.y, a.z, b.x, b.y, b.z, b.x, gb, b.z, a.x, a.y, a.z, b.x, gb, b.z, a.x, ga, a.z); H.push(1, 1, 0, 1, 0, 0);
+        const n = Math.max(1, Math.ceil(a.distanceTo(b) / 100)); for (let k = i > 1 ? 1 : 0; k <= n; k++) { const v = _a.lerpVectors(a, b, k / n); GT.push(v.x, gz(v) + 4, v.z); } }
       const cg = new THREE.BufferGeometry(); cg.setAttribute('position', new THREE.Float32BufferAttribute(V, 3)); cg.setAttribute('h', new THREE.Float32BufferAttribute(H, 1));
       add(new THREE.Mesh(cg, new THREE.ShaderMaterial({ transparent: true, side: THREE.DoubleSide, depthWrite: false, uniforms: { col: { value: col } },
         vertexShader: 'attribute float h; varying float vH; void main() { vH = h; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-        fragmentShader: 'uniform vec3 col; varying float vH; void main() { gl_FragColor = vec4(mix(col * 0.75, col, vH), 0.06 + 0.42 * pow(vH, 1.6)); }' })));
+        fragmentShader: 'uniform vec3 col; varying float vH; void main() { gl_FragColor = vec4(mix(col * 0.75, col, vH), 0.06 + 0.42 * pow(vH, 1.6)); }' })), 'curtain');
+      // … and its ground track: the path projected onto the terrain
+      const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(GT, 3));
+      add(new THREE.Line(gg, new THREE.LineBasicMaterial({ color: hex, transparent: true, opacity: .6, blending: THREE.AdditiveBlending, depthWrite: false })), 'ground');
+      // fixes: a diamond on the point (hollow: approximated point) with the name and chart altitude beside it, a thin drop line to the ground
       path.legs.forEach(([name, lat, lon, ft, flag], i) => { const v = pts[i]; D.push(v.x, v.y, v.z, v.x, gz(v), v.z);
         const key = name + lat + lon; if (seen.has(key)) return; seen.add(key);
-        const cv = document.createElement('canvas'); cv.width = 320; cv.height = 96; const c = cv.getContext('2d');
-        c.font = '600 34px system-ui, sans-serif'; c.fillStyle = '#fff'; c.textAlign = 'center'; c.fillText(name, 160, 40);
-        c.font = '28px ui-monospace, monospace'; c.fillStyle = 'rgba(255,255,255,.7)'; c.fillText((flag === 'ap' ? '≈ ' : '') + ft.toLocaleString('en') + ' ft', 160, 80);
+        const cv = document.createElement('canvas'); cv.width = 360; cv.height = 96; const c = cv.getContext('2d');
+        c.save(); c.translate(22, 48); c.rotate(Math.PI / 4); c.shadowColor = hx; c.shadowBlur = 12; c.fillStyle = flag === 'ap' ? 'rgba(8,10,20,.6)' : hx; c.fillRect(-9, -9, 18, 18);
+        c.lineWidth = 3.5; c.strokeStyle = hx; c.strokeRect(-9, -9, 18, 18); c.restore();
+        c.shadowColor = 'rgba(0,0,0,.9)'; c.shadowBlur = 6; c.textAlign = 'left';
+        c.font = '600 32px system-ui, sans-serif'; c.fillStyle = hx; c.fillText(name, 46, 42);
+        c.font = '500 25px system-ui, sans-serif'; c.fillStyle = 'rgba(255,255,255,.8)'; c.fillText((flag === 'ap' ? '≈ ' : '') + ft.toLocaleString('en') + ' ft', 46, 76);
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthTest: false, sizeAttenuation: false }));
-        sp.scale.set(.1, .03, 1); sp.center.set(.5, -.4); sp.position.set(v.x, v.y * zex, v.z); add(sp, scene);
-        const dot = new THREE.Mesh(new THREE.SphereGeometry(35, 12, 8), new THREE.MeshBasicMaterial({ color: flag === 'ap' ? 0x9aa0a6 : 0xffffff }));
-        dot.position.copy(v); dot.scale.y = 1 / zex; add(dot); });
+        sp.scale.set(.1125, .03, 1); sp.center.set(22 / 360, .5); sp.position.set(v.x, v.y * zex, v.z); add(sp, 'wp', scene); });
       const dg = new THREE.BufferGeometry(); dg.setAttribute('position', new THREE.Float32BufferAttribute(D, 3));
-      add(new THREE.LineSegments(dg, new THREE.LineBasicMaterial({ color: path.ma ? 0xf5a524 : pr.color, transparent: true, opacity: .25 }))); }
-    addPlanes(procs, add); }
+      add(new THREE.LineSegments(dg, new THREE.LineBasicMaterial({ color: hex, transparent: true, opacity: .25 })), 'wp'); }
+    addPlanes(procs); applyLayers(); }
+  function applyLayers() { const pl = state.pl; for (const o of L.proc) if (o.userData.layer) o.visible = pl[o.userData.layer] !== false; trailPts.visible = pl.planes !== false; }
 
-  // ---------- aircraft on the shown procedures: one flies the approach and lands, one takes off and flies the missed-approach
-  // route (there is no SID data). Times are sped up (AIR m/s ≈ 12× an approach speed); each loops with a short pause.
-  const AIR = 875, ROLL = 38, planes = [], planeMat = new Map();
-  const finMat = color => { if (!planeMat.has(color)) planeMat.set(color, new THREE.MeshPhongMaterial({ color, shininess: 60, side: THREE.DoubleSide })); return planeMat.get(color); };
-  let planeProto = null;
-  function planeModel(color) {   // AIRTRIX B737-800 (plane3d.js, nose +x) turned nose +Z for lookAt, at 4× its size (~143 m span) so it reads at airport scale
-    if (!planeProto) { planeProto = new THREE.Group(); const m = buildAircraft(B738); m.rotation.y = -Math.PI / 2; m.scale.setScalar(4); planeProto.add(m); }
-    const g = planeProto.clone(); g.userData.fin = g.getObjectByName('fin'); g.userData.fin.material = finMat(color); return g; }
+  // ---------- aircraft on the shown procedures: a glowing head with a fading trail, flown at real speeds sped up `tc`× ----------
+  // Arrivals fly the approach and land, departures take off and fly the missed-approach route (there is no SID data). The
+  // trail is the aircraft's own last TRAIL positions, one every TSTEP m, drawn as additive glow points (head near white,
+  // the trail in the procedure's colour, orange for departures); the head flashes like a strobe.
+  const KT = 0.514444, TRAIL = 46, TSTEP = 60, MAXAC = 160, planes = [], acs = new Map(); let simT = 0, followKey = null;
+  const GLOW = { uPx: { value: 1000 } };   // pixels per metre at 1 m: point size = metres × uPx / distance
+  const glowMat = new THREE.ShaderMaterial({ uniforms: GLOW, transparent: true, depthWrite: false, blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
+    vertexShader: `attribute vec3 aColor; attribute float aSize; attribute float aAlpha; uniform float uPx; varying vec3 vC; varying float vA;
+      void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); float raw = aSize * uPx / max(-mv.z, 0.001); float ps = clamp(raw, 3.0, 44.0);
+        vA = aAlpha * pow(min(raw / ps, 1.0), 0.55); vC = aColor; gl_PointSize = ps; gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `precision highp float; varying vec3 vC; varying float vA;
+      void main() { vec2 q = gl_PointCoord * 2.0 - 1.0; float r2 = dot(q, q); if (r2 > 1.0) discard; float a = (exp(-r2 * 7.0) + exp(-r2 * 2.2) * 0.42) * vA; gl_FragColor = vec4(vC * a, 1.0); }` });
+  const trail = { P: new Float32Array(MAXAC * TRAIL * 3), C: new Float32Array(MAXAC * TRAIL * 3), S: new Float32Array(MAXAC * TRAIL), A: new Float32Array(MAXAC * TRAIL) }, trailGeo = new THREE.BufferGeometry();
+  for (const [k, n, arr] of [['position', 3, trail.P], ['aColor', 3, trail.C], ['aSize', 1, trail.S], ['aAlpha', 1, trail.A]]) trailGeo.setAttribute(k, new THREE.BufferAttribute(arr, n).setUsage(THREE.DynamicDrawUsage));
+  const trailPts = new THREE.Points(trailGeo, glowMat); trailPts.frustumCulled = false; trailPts.renderOrder = 5; scene.add(trailPts);
+  const rgb = hex => [(hex >> 16 & 255) / 255, (hex >> 8 & 255) / 255, (hex & 255) / 255];
   // nodes: [x, metres AMSL, z, speed m/s, ground?]; the segment time uses the mean of its end speeds
   function track(nodes) { const t = [0];
     for (let i = 1; i < nodes.length; i++) { const a = nodes[i - 1], b = nodes[i];
       t.push(t[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) / ((a[3] + b[3]) / 2)); }
     return { nodes, t, T: t[t.length - 1] }; }
+  const spdA = ft => (ft >= 3000 ? 220 : ft >= 1500 ? 180 : 145) * KT, spdD = ft => (ft >= 3000 ? 230 : ft >= 1500 ? 200 : 165) * KT;   // approach / climb speeds by altitude (kt)
   // ops: 'arr' = arrivals only, 'dep' = departures only (the runway's role, e.g. Incheon). The shown procedures of such a
-  // runway share one stream that takes its ends in turn (both ends shown → the direction alternates): arrivals land on the
-  // procedure's end, departures take off from it and fly its missed-approach route. Departures follow each other as soon
-  // as the runway is clear, arrivals 3 s after the previous one has gone. Without ops, one lands and one takes off.
-  function addPlanes(procs, add) { planes.length = 0;
+  // runway share one stream: arrivals land on the procedure's end, departures take off from it and fly its missed-approach
+  // route. A stream on one runway end launches an aircraft every state.gap s (departures once the runway is clear); with
+  // both ends shown the stream takes the ends in turn, one aircraft at a time. Without ops, a runway lands and takes off.
+  function addPlanes(procs) { planes.length = 0; acs.clear();
     const runs = new Map();                       // runway index + role → launches of the stream
     procs.forEach((pr, k) => { const ri = AP.rwys.findIndex(r => r.nameA === pr.rwy || r.nameB === pr.rwy); if (ri < 0) return;
       const rw = frames(scen() !== 'ex')[ri], atA = rw.nameA === pr.rwy, P0 = atA ? rw.A : rw.B, e = atA ? rw.eA : rw.eB,
         dir = atA ? rw.U : [-rw.U[0], -rw.U[1]], mv = procShift(pr);
       // s metres from the threshold along the runway, on the terrain where it sits above the runway elevation
       const on = s => { const x = P0[0] + dir[0] * s, y = P0[1] + dir[1] * s; return [x, Math.max(e, demAt(x, y) ?? e), -y]; };
-      const legPts = (path, from = 0) => path.legs.slice(from).map(([, lat, lon, ft], i) => { const P = LL(AP, [lat, lon]), [x, y] = i + from || path.ma ? mv(P) : P;
-        return [x, ft * 0.3048, -y, AIR, false]; });
-      const app = pr.paths.find(p => !p.ma), ma = pr.paths.find(p => p.ma);
+      const legPts = (path, spd, from = 0) => path.legs.slice(from).map(([, lat, lon, ft], i) => { const P = LL(AP, [lat, lon]), [x, y] = i + from || path.ma ? mv(P) : P;
+        return [x, ft * 0.3048, -y, spd(ft), false]; });
+      const app = pr.paths.find(p => !p.ma), ma = pr.paths.find(p => p.ma), base = { pr, end: pr.rwy, hex: pr.color, color: rgb(pr.color) };
       let land = null, dep = null;
-      if (app) { const n = legPts(app); n.push([...on(300), AIR, true]);            // touchdown 300 m past the threshold, then roll out
-        for (let j = 1; j <= 6; j++) n.push([...on(300 + 250 * j), AIR + (ROLL - AIR) * j / 6, true]); land = track(n); }
-      if (ma) { const n = []; for (let j = 0; j <= 6; j++) n.push([...on(300 * j), ROLL + (AIR - ROLL) * j / 6, true]);   // roll 1 800 m, lift off
-        dep = track([...n, ...legPts(ma, 1)]); }
-      const after = tr => ({ tr, gap: tr.T + 3, color: pr.color });                   // next one 3 s after this one is gone
-      const clear = tr => ({ tr, gap: tr.t[6] + Math.max(0, rw.L - 1800) / AIR + 1, color: pr.color });   // next one 1 s after this one passes the runway end
-      if (pr.ops === 'arr' || pr.ops === 'dep') { const key = ri + pr.ops, l = pr.ops === 'arr' ? land && after(land) : dep && clear(dep);
-        if (l) { if (!runs.has(key)) runs.set(key, { seq: [], off: k * 7 }); runs.get(key).seq.push(l); } }
-      else { if (land) fly([after(land)], k * 23); if (dep) fly([after(dep)], k * 23 + 11); } });
+      if (app) { const n = legPts(app, spdA); n.push([...on(300), 140 * KT, true]);            // touchdown 300 m past the threshold, then roll out
+        for (let j = 1; j <= 6; j++) n.push([...on(300 + 250 * j), 140 * KT + (15 - 140 * KT) * j / 6, true]); land = { ...base, kind: 'arr', tr: track(n) }; }
+      if (ma) { const n = []; for (let j = 0; j <= 6; j++) n.push([...on(300 * j), 1 + 79 * j / 6, true]);   // roll 1 800 m, lift off at ~155 kt
+        const tr = track([...n, ...legPts(ma, spdD, 1)]); dep = { ...base, kind: 'dep', hex: 0xf5a524, color: rgb(0xf5a524), tr, clear: tr.t[6] + Math.max(0, rw.L - 1800) / 80 + 1 }; }   // clear: s until it is past the runway end
+      if (pr.ops === 'arr' || pr.ops === 'dep') { const key = ri + pr.ops, l = pr.ops === 'arr' ? land : dep;
+        if (l) { if (!runs.has(key)) runs.set(key, { seq: [], off: k * 41 }); runs.get(key).seq.push(l); } }
+      else { if (land) fly([land], k * 41); if (dep) fly([dep], k * 41 + 60); } });
     for (const { seq, off } of runs.values()) fly(seq, off);
-    // a stream: launches in turn, each `gap` s after the previous one; enough aircraft for the launches in the air at once
-    function fly(seq, off) { const n = Math.ceil(Math.max(...seq.map(q => q.tr.T)) / Math.min(...seq.map(q => q.gap))) + 1;
-      const pool = Array.from({ length: n }, () => { const o = planeModel(seq[0].color); add(o, scene); return o; }); planes.push({ pool, seq, off }); } }
-  const _a = new THREE.Vector3(), _b = new THREE.Vector3();
-  // A fixed 4× the true size (AIRTRIX dimensions) at every zoom: rides on top of the path line, on the ground it sits on its wheels.
-  function flyPlanes(now) { if (!planes.length) return; const zex = G.scale.y;
-    for (const p of planes) { const cycle = p.seq.reduce((n, q) => n + q.gap, 0), t0 = (now / 1000 + p.off) % cycle;
-      const live = [];                                     // launches still in the air: this cycle's and earlier cycles'
-      for (let c = 0; c * cycle <= Math.max(...p.seq.map(q => q.tr.T)) + cycle; c++)
-        for (let j = 0, start = 0; j < p.seq.length; start += p.seq[j].gap, j++) { const age = t0 - start + c * cycle;
-          if (age >= 0 && age < p.seq[j].tr.T) live.push([p.seq[j].tr, age, p.seq[j].color]); }
-      p.live = live.length;
-      p.pool.forEach((o, n) => { o.visible = n < live.length; if (o.visible) { o.userData.fin.material = finMat(live[n][2]); flyOne(o, live[n][0], live[n][1], zex); } }); } }
-  function flyOne(o, tr, tt, zex) { const { nodes, t } = tr;
-      let i = 1; while (i < t.length - 1 && t[i] < tt) i++;
-      const f = Math.min(1, (tt - t[i - 1]) / (t[i] - t[i - 1] || 1)), a = nodes[i - 1], b = nodes[i];
-      _a.set(a[0], a[1] * zex, a[2]); _b.set(b[0], b[1] * zex, b[2]); o.position.lerpVectors(_a, _b, f);
-      const lift = (n) => (n[4] ? 0 : 9 * zex);   // true size; airborne it rides on top of the path line
-      o.position.y += lift(a) + (lift(b) - lift(a)) * f; _b.y += lift(b);
-      if (o.position.distanceToSquared(_b) > 1) o.lookAt(_b); }
+    // a stream: launches in turn, each `gap` s after the previous one
+    function fly(seq, off) { const one = seq.every(q => q.end === seq[0].end);
+      for (const q of seq) q.gap = one ? Math.max(state.gap, q.clear || 0) : q.kind === 'arr' ? q.tr.T + 3 : q.clear;
+      planes.push({ seq, off, cycle: seq.reduce((n, q) => n + q.gap, 0), T: Math.max(...seq.map(q => q.tr.T)) }); } }
+  const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
+  // position, speed, ground flag and heading of a track `tt` s in
+  function at(tr, tt, o) { const { nodes, t } = tr; let i = 1; while (i < t.length - 1 && t[i] < tt) i++;
+    const f = Math.min(1, Math.max(0, (tt - t[i - 1]) / (t[i] - t[i - 1] || 1))), a = nodes[i - 1], b = nodes[i];
+    o.x = a[0] + (b[0] - a[0]) * f; o.y = a[1] + (b[1] - a[1]) * f; o.z = a[2] + (b[2] - a[2]) * f; o.v = a[3] + (b[3] - a[3]) * f; o.g = f < 1 ? a[4] : b[4];
+    o.dx = b[0] - a[0]; o.dy = b[1] - a[1]; o.dz = b[2] - a[2]; return o; }
+  const liftOf = a => a.y + (a.g ? 2 : 12);   // drawn just above the path tube (on the ground, just above the runway)
+  // Every frame: advance the clock, find the launches in the air (this cycle's and earlier ones'), move each aircraft on,
+  // extend its trail, and write the head and trail points. Keyed by stream, cycle and launch, so a trail follows its aircraft.
+  function flyPlanes(dt) { simT += dt * state.tc; const zex = G.scale.y, now = performance.now() / 1000, seen = new Set(); let c = 0;
+    GLOW.uPx.value = renderer.domElement.height / (2 * Math.tan(camera.fov * Math.PI / 360));
+    for (let si = 0; si < planes.length; si++) { const p = planes[si], T = simT + p.off, cN = Math.floor(T / p.cycle), t0 = T - cN * p.cycle; p.live = 0;
+      for (let cc = 0; cc * p.cycle <= p.T + p.cycle && cN - cc >= 0; cc++)
+        for (let j = 0, start = 0; j < p.seq.length; start += p.seq[j].gap, j++) { const q = p.seq[j], age = t0 - start + cc * p.cycle; if (age < 0 || age >= q.tr.T) continue;
+          const key = si + ':' + (cN - cc) + ':' + j; seen.add(key); p.live++;
+          let a = acs.get(key); if (!a) { a = { key, q, age, hx: new Float32Array(TRAIL), hy: new Float32Array(TRAIL), hz: new Float32Array(TRAIL), hh: 0, hn: 0, hacc: 0, strobe: Math.random() * 1.5 };
+            at(q.tr, age, a); a.hx.fill(a.x); a.hy.fill(liftOf(a)); a.hz.fill(a.z); acs.set(key, a); }
+          const px = a.x, py = liftOf(a), pz = a.z; at(q.tr, age, a); a.age = age; const ly = liftOf(a);
+          const dd = Math.hypot(a.x - px, ly - py, a.z - pz); a.hacc += dd;   // trail history: a point every TSTEP m flown
+          while (a.hacc >= TSTEP) { a.hacc -= TSTEP; const f = dd > 1e-9 ? 1 - a.hacc / dd : 1; a.hh = (a.hh + 1) % TRAIL;
+            a.hx[a.hh] = px + (a.x - px) * f; a.hy[a.hh] = py + (ly - py) * f; a.hz[a.hh] = pz + (a.z - pz) * f; if (a.hn < TRAIL) a.hn++; }
+          if (c >= MAXAC) continue;
+          const tc = q.color, hc = tc.map(v => v + (1 - v) * .7), fl = ((now + a.strobe) % 1.5) < .12 ? 1 : 0;
+          for (let i = 0; i < TRAIL; i++) { const n = c * TRAIL + i, o = n * 3;
+            if (i === 0) { trail.P[o] = a.x; trail.P[o + 1] = ly * zex; trail.P[o + 2] = a.z; trail.C[o] = hc[0]; trail.C[o + 1] = hc[1]; trail.C[o + 2] = hc[2]; trail.S[n] = 130 + fl * 40; trail.A[n] = .8 + fl * .7; continue; }
+            if (i - 1 >= a.hn) { trail.A[n] = 0; trail.S[n] = 1; trail.P[o + 1] = -1e5; continue; }
+            const j = (a.hh - (i - 1) + TRAIL * 2) % TRAIL, u = i / (TRAIL - 1), m = (1 - u) * .45;
+            trail.P[o] = a.hx[j]; trail.P[o + 1] = a.hy[j] * zex; trail.P[o + 2] = a.hz[j];
+            trail.C[o] = tc[0] + (hc[0] - tc[0]) * m; trail.C[o + 1] = tc[1] + (hc[1] - tc[1]) * m; trail.C[o + 2] = tc[2] + (hc[2] - tc[2]) * m;
+            trail.S[n] = 85 + (26 - 85) * u; trail.A[n] = .85 * Math.pow(1 - u, 1.45); }
+          c++; } }
+    for (const k of acs.keys()) if (!seen.has(k)) acs.delete(k);
+    trailGeo.setDrawRange(0, c * TRAIL); for (const k in trailGeo.attributes) trailGeo.attributes[k].needsUpdate = true;
+    followCam(); labels(); }
+  // follow: the camera rides behind the aircraft with the longest flight still ahead of it, then the next; orbiting around it still works
+  function followCam() { if (!state.follow || !acs.size) { followKey = null; return; }
+    let a = acs.get(followKey);
+    if (!a) { for (const b of acs.values()) if (!a || b.q.tr.T - b.age > a.q.tr.T - a.age) a = b; followKey = a.key;
+      _b.set(a.dx, a.dy * G.scale.y, a.dz).normalize(); camera.position.set(a.x, liftOf(a) * G.scale.y, a.z).addScaledVector(_b, -1600); camera.position.y += 500; }
+    _a.set(a.x, liftOf(a) * G.scale.y, a.z); camera.position.add(_c.copy(_a).sub(ctl.target)); ctl.target.copy(_a); }
+  // aircraft labels (HTML over the canvas): procedure and phase, altitude and speed, on the nearest aircraft on screen
+  const lbl = document.createElement('div'); lbl.style.cssText = 'position:absolute;inset:0;overflow:hidden;pointer-events:none;font:500 11px/1.25 ui-sans-serif,system-ui,sans-serif';
+  canvas.parentElement?.insertBefore(lbl, canvas.nextSibling);
+  const lblEls = Array.from({ length: 10 }, () => { const e = document.createElement('div');
+    e.style.cssText = 'position:absolute;left:0;top:0;visibility:hidden;white-space:nowrap;padding-left:8px;border-left:1.5px solid #fff;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.9),0 0 2px rgba(0,0,0,.8);will-change:transform';
+    e.innerHTML = '<b style="display:block;font-weight:600"></b><span style="opacity:.8"></span>'; lbl.appendChild(e); return { e, b: e.firstChild, s: e.lastChild, t1: '', t2: '', on: false }; });
+  function labels() { const w = canvas.clientWidth, h = canvas.clientHeight, zex = G.scale.y; let list = [];
+    if (state.pl.planes !== false && state.pl.labels !== false) for (const a of acs.values()) { _c.set(a.x, liftOf(a) * zex, a.z); const d = _c.distanceTo(camera.position); if (d > 60000) continue;
+      _c.project(camera); if (_c.z >= 1 || Math.abs(_c.x) > .98 || Math.abs(_c.y) > .98) continue; list.push({ a, d, x: (_c.x * .5 + .5) * w, y: (-_c.y * .5 + .5) * h }); }
+    list.sort((p, q) => p.d - q.d); const kept = [];   // nearest first; a label that would sit on another is left out
+    for (const o of list) { if (kept.length >= lblEls.length) break; if (!kept.some(k => Math.abs(k.y - o.y) < 30 && Math.abs(k.x - o.x) < 160)) kept.push(o); }
+    lblEls.forEach((el, i) => { const o = kept[i]; if (!o) { if (el.on) { el.e.style.visibility = 'hidden'; el.on = false; } return; }
+      const a = o.a, t1 = a.q.pr.name + ' · ' + (a.q.kind === 'arr' ? 'ARR' : 'DEP'), t2 = a.g ? 'on runway' : (Math.round(a.y / 3.048) * 10).toLocaleString('en') + ' ft · ' + Math.round(a.v / KT) + ' kt';
+      if (t1 !== el.t1) { el.b.textContent = t1; el.t1 = t1; el.e.style.borderColor = el.b.style.color = '#' + a.q.hex.toString(16).padStart(6, '0'); }
+      if (t2 !== el.t2) { el.s.textContent = t2; el.t2 = t2; }
+      el.e.style.transform = `translate(${(o.x + 9).toFixed(0)}px,${(o.y - 12).toFixed(0)}px)`; if (!el.on) { el.e.style.visibility = 'visible'; el.on = true; } }); }
 
   // ---------- noise (Lden) ----------
   // Tracks: straight along each runway end's extended centreline; arrivals from the touchdown point (THR + 291 m),
@@ -716,7 +774,7 @@ export function createEngine(canvas, cb) {
     if (K.t !== kT) { K.t = kT; buildOverlay(rwsEx, rwsExt); K.b = null; }
     if (K.b !== kB || texPending) { K.b = kB; buildBase(); } else if (hiPending) buildHi();
     const kN = [k0, state.noise, JSON.stringify(state.noiseCfg)].join('|'); if (K.n !== kN) { K.n = kN; buildNoise(); }
-    const kP = [k0, state.proc.join(','), G.scale.y, AP.dem ? 1 : 0].join('|'); if (K.p !== kP) { K.p = kP; buildProcs(); } }
+    const kP = [k0, state.proc.join(','), G.scale.y, AP.dem ? 1 : 0, state.gap].join('|'); if (K.p !== kP) { K.p = kP; buildProcs(); } }
   function scheduleSync() { if (syncQueued) return; syncQueued = true; requestAnimationFrame(() => { syncQueued = false; sync(); }); }
   function fit(kind) { if (!AP) return;
     const procs = (PROCEDURES[APID] || []).filter(p => state.proc.includes(p.id));
@@ -727,7 +785,9 @@ export function createEngine(canvas, cb) {
     const r = kind === 'rwy' ? AP.fitRwy : AP.fitAll, ax = frames(false)[0], c = Wp(ax, ax.L / 2, 0);
     ctl.target.set(c[0], state.E * G.scale.y, -c[1]); camera.position.set(c[0] - r * .9, state.E * G.scale.y + r * .8, -c[1] + r * .9); ctl.update(); }
   function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
-  function loop() { if (!alive) return; ctl.update(); const now = performance.now(); flyPlanes(now); waves(now); renderer.render(scene, camera); requestAnimationFrame(loop); }
+  let last = performance.now();
+  function loop() { if (!alive) return; const now = performance.now(), dt = Math.min(.1, (now - last) / 1000); last = now;
+    flyPlanes(dt); ctl.update(); waves(now); renderer.render(scene, camera); requestAnimationFrame(loop); }   // the aircraft move the camera when it follows one, before the controls settle it
 
   // ---------- picking: obstacle → its clearance, otherwise the OLS limit at that point ----------
   const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
@@ -747,6 +807,8 @@ export function createEngine(canvas, cb) {
     for (const [k, v] of Object.entries(patch)) { if (k === 'surf') state.surf = new Set(v); else if (k === 'extA' || k === 'extB') state[k] = [...v];
       else if (k === 'par') state.par = v.map(p => ({ ri: p.ri, off: +p.off || 0, len: Math.max(0, +p.len || 0), shift: +p.shift || 0, on: p.on !== false })).filter(p => AP && AP.rwys[p.ri]); else state[k] = v; }
     if ('rot' in patch) ctl.autoRotate = !!patch.rot;
+    if ('pl' in patch) applyLayers();
+    if ('follow' in patch) { followKey = null; if (patch.follow) { state.rot = false; ctl.autoRotate = false; } }   // following an aircraft and auto-rotating are at odds
     if ('noiseFrom' in patch && NZ.grid) drawNoise();
     if ('zex' in patch) { const dy = state.E * (+patch.zex - G.scale.y); G.scale.y = +patch.zex; ctl.target.y += dy; camera.position.y += dy; }   // keep the view: camera rides up with the aerodrome
     sync(); emit(); }
@@ -762,12 +824,12 @@ export function createEngine(canvas, cb) {
     return { apId: APID, dem: AP.dem ? AP.dem.src : null, area: +(n * 0.0036).toFixed(2), worst, bySurface: by, obsChecked: L.obsList.length, obsBad: bad }; }
   function setExt(i, end, len) { if (!AP) return; (end === 'A' ? state.extA : state.extB)[i] = Math.max(0, +len || 0); sync(); emit(); }
   function setRunway(i, on) { if (!AP) return; if (i < AP.rwys.length) AP._on[i] = on; else if (state.par[i - AP.rwys.length]) state.par[i - AP.rwys.length].on = on; sync(); emit(); }   // i past the airport's runways = an added parallel runway
-  function destroy() { alive = false; canvas.removeEventListener('pointermove', onMove); ctl.dispose(); renderer.dispose(); }
+  function destroy() { alive = false; canvas.removeEventListener('pointermove', onMove); lbl.remove(); ctl.dispose(); renderer.dispose(); }
 
   resize(); loop();
   // console probes for terrain checks: __ols.probe.dem(x, y), __ols.probe.ols(x, y), __ols.probe.xy(lat, lon), __ols.probe.cam(x, y, h, tx, ty)
   const probe = { noiseEdge: () => noiseEdge(), noiseGrid: () => NZ.grid, dem: (x, y) => demAt(x, y), ols: (x, y) => ols([x, y], frames(true)), xy: (lat, lon) => LL(AP, [lat, lon]), cam: (x, y, h, tx, ty) => { state.rot = false; camera.position.set(x, h, -y); ctl.target.set(tx, 0, -ty); ctl.update(); }, rws: () => frames(false).map(f => ({ A: f.A, B: f.B, eA: f.eA, eB: f.eB })), demInfo: () => AP.dem && { src: AP.dem.src, dx: AP.dem.dx, dy: AP.dem.dy, nx: AP.dem.nx, ny: AP.dem.ny } };
   const noiseEdge = () => { const g = NZ.grid; if (!g) return null; let m = -1e9; for (let i = 0; i < g.nx; i++) m = Math.max(m, g.L[i], g.L[(g.ny - 1) * g.nx + i]); for (let j = 0; j < g.ny; j++) m = Math.max(m, g.L[j * g.nx], g.L[j * g.nx + g.nx - 1]); return +m.toFixed(1); };
-  const debug = () => ({ hi: { on: hiU.hiOn.value, rect: hiU.hiRect.value.toArray().map(Math.round), w: hiCv.width, h: hiCv.height, img: hiCv.width ? hiCv.toDataURL('image/jpeg', .4) : null, mat: !!L.ground?.material.onBeforeCompile }, planes: planes.map(p => ({ T: p.seq.map(q => Math.round(q.tr.T)), gap: p.seq.map(q => +q.gap.toFixed(1)), pool: p.pool.length, live: p.live, pos: p.pool.filter(o => o.visible).map(o => o.position.toArray().map(Math.round)) })), pending: texPending, K: { ...K }, texW: texCv.width, texH: texCv.height, hsW: hsCv.width, tex: texCv.toDataURL('image/jpeg', .5), hs: hsCv.width ? hsCv.toDataURL('image/jpeg', .5) : null });
+  const debug = () => ({ hi: { on: hiU.hiOn.value, rect: hiU.hiRect.value.toArray().map(Math.round), w: hiCv.width, h: hiCv.height, img: hiCv.width ? hiCv.toDataURL('image/jpeg', .4) : null, mat: !!L.ground?.material.onBeforeCompile }, planes: planes.map(p => ({ T: p.seq.map(q => Math.round(q.tr.T)), gap: p.seq.map(q => +q.gap.toFixed(1)), live: p.live })), aircraft: [...acs.values()].map(a => ({ key: a.key, age: Math.round(a.age), pos: [a.x, a.y, a.z].map(Math.round), kt: Math.round(a.v / KT), g: a.g })), simT: Math.round(simT), pending: texPending, K: { ...K }, texW: texCv.width, texH: texCv.height, hsW: hsCv.width, tex: texCv.toDataURL('image/jpeg', .5), hs: hsCv.width ? hsCv.toDataURL('image/jpeg', .5) : null });
   return { switchAirport, set, setExt, setRunway, fit, resize, destroy, snapshot, stats, debug, probe };
 }

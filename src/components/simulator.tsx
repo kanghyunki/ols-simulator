@@ -339,7 +339,24 @@ export function Simulator({ onHome }: { onHome: () => void }) {
                   </Toggle>
                 ))}
               </div>; })}
-            <Note>{(PROC_NOTES as Record<string, string>)[snap?.apId ?? ""]} {t("Approaches at chart minimum altitudes, flown as straight legs; DME arcs drawn through intermediate points. Orange: missed approach; ≈ points approximate (2.5 % minimum climb).", "차트 최저고도로 그린 접근경로이며, 지점 사이는 직선, DME 호는 중간점으로 그렸습니다. 주황: 실패접근, ≈ 표시 지점은 근사값(최소 상승률 2.5 %).")}</Note>
+            {/* what is drawn, how fast the aircraft fly (× real time) and how closely they follow each other on a runway */}
+            <div className="mt-3 text-[11px] text-white/50">{t("Show", "표시")}</div>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {([["paths", "Paths", "경로"], ["curtain", "Altitude curtains", "고도 커튼"], ["ground", "Ground tracks", "지상 궤적"], ["wp", "Fixes", "지점"], ["planes", "Aircraft", "항공기"], ["labels", "Aircraft labels", "항공기 라벨"]] as [string, string, string][]).map(([k, en, kr]) => (
+                <Toggle key={k} size="sm" className={pill} pressed={(st?.pl as any)?.[k] !== false} onPressedChange={(v) => set({ pl: { ...(st?.pl as any), [k]: v } })}>{t(en, kr)}</Toggle>))}
+            </div>
+            <div className="mt-3 text-[11px] text-white/50">{t("Playback", "재생 속도")}</div>
+            <ToggleGroup type="single" value={String(st?.tc ?? 10)} onValueChange={(v) => v && set({ tc: +v })} className="mt-1 justify-start gap-1.5">
+              {[[0, t("Pause", "정지")], [1, "1×"], [5, "5×"], [10, "10×"], [20, "20×"], [50, "50×"]].map(([v, l]) => <ToggleGroupItem key={v} value={String(v)} size="sm" className={pill}>{l}</ToggleGroupItem>)}
+            </ToggleGroup>
+            <div className="mt-3 text-[11px] text-white/50">{t("Traffic", "교통량")}</div>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <ToggleGroup type="single" value={String(st?.gap ?? 120)} onValueChange={(v) => v && set({ gap: +v })} className="justify-start gap-1.5">
+                {([[240, "Light", "한산"], [120, "Normal", "보통"], [60, "Busy", "혼잡"]] as [number, string, string][]).map(([v, en, kr]) => <ToggleGroupItem key={v} value={String(v)} size="sm" className={pill} title={t(`One aircraft every ${v / 60} min on a runway`, `활주로마다 ${v / 60}분에 한 대`)}>{t(en, kr)}</ToggleGroupItem>)}
+              </ToggleGroup>
+              <Toggle size="sm" className={pill} pressed={!!st?.follow} onPressedChange={(v) => set({ follow: v })}>{t("Follow an aircraft", "항공기 따라가기")}</Toggle>
+            </div>
+            <Note>{(PROC_NOTES as Record<string, string>)[snap?.apId ?? ""]} {t("Approaches at chart minimum altitudes, flown as straight legs; DME arcs drawn through intermediate points. Orange: missed approach, flown by departures; ≈ points approximate (2.5 % minimum climb). Aircraft fly at typical approach and climb speeds, sped up by the playback factor.", "차트 최저고도로 그린 접근경로이며, 지점 사이는 직선, DME 호는 중간점으로 그렸습니다. 주황: 실패접근(이륙기가 따라 비행), ≈ 표시 지점은 근사값(최소 상승률 2.5 %). 항공기는 통상 접근·상승 속도로 날며, 재생 속도만큼 빨리 갑니다.")}</Note>
           </> : <Note>{t("No flight procedures for this airport yet. Available: Incheon, Gimpo, Jeju, Gimhae.", "이 공항은 아직 비행절차 자료가 없습니다. 지금은 인천·김포·제주·김해에 있습니다.")}</Note>)}
 
           {tab === "check" && <>
