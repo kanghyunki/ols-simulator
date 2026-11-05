@@ -86,7 +86,7 @@ export function createEngine(canvas, cb) {
   const state = { showEx: false, extA: [], extB: [], par: [], E: 39, base: 'sat', pen: true, obs: true, ofz: false, rev: 'old', proc: [], bldH: 6,
     surf: new Set(DEFAULT_KEYS), rot: true, zex: 5, noise: false, noise3d: false, noiseBld: false, noiseCfg: null,   // noiseCfg: overrides of NOISE_TRAFFIC (annual, north, evening, night)   // zex: vertical exaggeration, 5× by default so relief and the surfaces' slopes read at airport scale
     // flight procedures: pl = the layers shown, tc = playback (× real time, 0 = paused), gap = s between aircraft on a runway, follow = the camera rides with an aircraft
-    pl: { paths: true, curtain: true, ground: false, wp: true, planes: true, labels: true }, tc: 10, gap: 120, follow: false };
+    pl: { curtain: true, ground: false, wp: true, planes: true, labels: true }, tc: 10, gap: 120, follow: false };
 
   // ---------- coordinates / geometry core (per-runway frames) ----------
   function initAp(ap) { if (!ap._k) { const lat0 = ap.osm.origin[0]; ap._k = [111320 * Math.cos(lat0 * Math.PI / 180), 110574]; }
@@ -528,8 +528,8 @@ export function createEngine(canvas, cb) {
       strip(rw.baseA, rw.baseB, rw.eA, rw.eB, rw.on ? 0xe8e4dc : 0x6b675f); });
     if (scen() !== 'ex') rwsExt.slice(rwsEx.length).forEach(rw => strip(rw.A, rw.B, rw.eA, rw.eB, 0xe8a55a)); }   // added parallel runways
 
-  // Instrument procedures (src/data/procedures.js): each leg a straight tube at its chart altitude, a faint curtain down to
-  // the ground so the height over terrain reads, and a labelled marker per fix. Labels live in the scene (not G) so the
+  // Instrument procedures (src/data/procedures.js): each leg a straight line at its chart altitude, drawn as a curtain down to
+  // the ground (densest at the path) so the height over terrain reads, and a labelled marker per fix. Labels live in the scene (not G) so the
   // vertical exaggeration does not stretch them.
   // With a runway extension (scenario), points on that runway's extended centreline move with the nearer runway end:
   // the straight-in course and threshold with the landing end, the 500 ft missed-approach turn with the far end. IAFs and
@@ -538,19 +538,15 @@ export function createEngine(canvas, cb) {
     const rw = frames(scen() !== 'ex')[i], dA = [rw.A[0] - rw.baseA[0], rw.A[1] - rw.baseA[1]], dB = [rw.B[0] - rw.baseB[0], rw.B[1] - rw.baseB[1]];
     return P => { const px = P[0] - rw.baseA[0], py = P[1] - rw.baseA[1], s = px * rw.U[0] + py * rw.U[1], d = px * rw.N[0] + py * rw.N[1];
       if (Math.abs(d) > 150) return P; const m = s < rw.baseL / 2 ? dA : dB; return [P[0] + m[0], P[1] + m[1]]; }; }
-  // Each object carries the layer it belongs to (state.pl): paths, curtain, ground (the track on the terrain), wp (fixes).
+  // Each object carries the layer it belongs to (state.pl): curtain (the path), ground (the track on the terrain), wp (fixes).
   function buildProcs() {
     L.proc.forEach(o => { o.parent.remove(o); o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose(); }); L.proc.length = 0;
     const procs = (PROCEDURES[APID] || []).filter(p => state.proc.includes(p.id)); if (!procs.length) { addPlanes([]); return; }
     const add = (o, layer, parent = G) => { o.userData.layer = layer; parent.add(o); L.proc.push(o); }, zex = G.scale.y, seen = new Set();
     for (const pr of procs) for (const path of pr.paths) { const mv = procShift(pr);
       const pts = path.legs.map(([, lat, lon, ft], i) => { const P = LL(AP, [lat, lon]), [x, y] = i || path.ma ? mv(P) : P; return new THREE.Vector3(x, ft * 0.3048, -y); });
-      const curve = new THREE.CurvePath(); for (let i = 1; i < pts.length; i++) curve.add(new THREE.LineCurve3(pts[i - 1], pts[i]));
-      // the path: a tube in the procedure's colour (orange for the missed approach), …
+      // the path: a translucent curtain in the procedure's colour (orange for the missed approach) from the path down to the ground, densest at the path, …
       const hex = path.ma ? 0xf5a524 : pr.color, col = new THREE.Color(hex), hx = '#' + hex.toString(16).padStart(6, '0');
-      add(new THREE.Mesh(new THREE.TubeGeometry(curve, 64 * (pts.length - 1), 9, 6, false),
-        new THREE.MeshBasicMaterial({ color: col.clone().lerp(new THREE.Color(0xffffff), .35), transparent: true, opacity: .9 })), 'paths');
-      // … a translucent curtain from the path down to the ground, densest at the path, …
       const V = [], H = [], D = [], GT = [], gz = v => Math.max(0, demAt(v.x, -v.z) ?? 0);
       for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], ga = gz(a), gb = gz(b);
         V.push(a.x, a.y, a.z, b.x, b.y, b.z, b.x, gb, b.z, a.x, a.y, a.z, b.x, gb, b.z, a.x, ga, a.z); H.push(1, 1, 0, 1, 0, 0);

@@ -342,7 +342,7 @@ export function Simulator({ onHome }: { onHome: () => void }) {
             {/* what is drawn, how fast the aircraft fly (× real time) and how closely they follow each other on a runway */}
             <div className="mt-3 text-[11px] text-white/50">{t("Show", "표시")}</div>
             <div className="mt-1 flex flex-wrap gap-1.5">
-              {([["paths", "Paths", "경로"], ["curtain", "Altitude curtains", "고도 커튼"], ["ground", "Ground tracks", "지상 궤적"], ["wp", "Fixes", "지점"], ["planes", "Aircraft", "항공기"], ["labels", "Aircraft labels", "항공기 라벨"]] as [string, string, string][]).map(([k, en, kr]) => (
+              {([["curtain", "Paths", "경로"], ["ground", "Ground tracks", "지상 궤적"], ["wp", "Fixes", "지점"], ["planes", "Aircraft", "항공기"], ["labels", "Aircraft labels", "항공기 라벨"]] as [string, string, string][]).map(([k, en, kr]) => (
                 <Toggle key={k} size="sm" className={pill} pressed={(st?.pl as any)?.[k] !== false} onPressedChange={(v) => set({ pl: { ...(st?.pl as any), [k]: v } })}>{t(en, kr)}</Toggle>))}
             </div>
             <div className="mt-3 text-[11px] text-white/50">{t("Playback", "재생 속도")}</div>
