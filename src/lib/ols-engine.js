@@ -318,7 +318,7 @@ export function createEngine(canvas, cb) {
   function snapshot() {
     const ap = APID && AIRPORTS[APID];
     return { apId: APID, loading: !!ap && !ap.osm && !ap._failed, failed: !!ap && !!ap._failed, pending: texPending,
-      ap: AP ? { procs: (PROCEDURES[APID] || []).map(p => ({ id: p.id, name: p.name, color: p.color, rwy: p.rwy, ops: p.ops || null })), name: AP.name, sub: AP.sub, E: AP.E, code: AP.code || 4, origin: AP.osm.origin, ext: AP.ext || null, assume: AP.assume,
+      ap: AP ? { procs: (PROCEDURES[APID] || []).map(p => ({ id: p.id, name: p.name, color: p.color, rwy: p.rwy, ops: p.ops || null, group: p.group || null })), name: AP.name, sub: AP.sub, E: AP.E, code: AP.code || 4, origin: AP.osm.origin, ext: AP.ext || null, assume: AP.assume,
         rwys: AP.rwys.map((r, i) => ({ id: r.id, len: r.len, on: AP._on[i], nameA: r.nameA, nameB: r.nameB })),
         pars: state.par.map((p, k) => { const r = AP.rwys[p.ri]; return { id: '∥ ' + r.id, len: p.len || r.len, on: p.on !== false, i: AP.rwys.length + k }; }),   // added parallel runways, toggled through setRunway(i)
         dem: AP.dem ? 'ok' : AP._demLoading ? 'loading' : AP._demFailed ? 'failed' : 'none', demSrc: AP.dem && AP.dem.src } : null,
@@ -602,8 +602,12 @@ export function createEngine(canvas, cb) {
   // both ends shown the stream takes the ends in turn, one aircraft at a time. Without ops, a runway lands and takes off.
   function addPlanes(procs) { planes.length = 0; acs.clear();
     const runs = new Map();                       // runway index + role → launches of the stream
-    procs.forEach((pr, k) => { const ri = AP.rwys.findIndex(r => r.nameA === pr.rwy || r.nameB === pr.rwy); if (ri < 0) return;
-      const rw = frames(scen() !== 'ex')[ri], atA = rw.nameA === pr.rwy, P0 = atA ? rw.A : rw.B, e = atA ? rw.eA : rw.eB,
+    procs.forEach((pr, k) => { const ri = AP.rwys.findIndex(r => r.nameA === pr.rwy || r.nameB === pr.rwy);
+      // a runway the airport does not model (a VFR circuit's): its frame from the procedure's own `rw` [threshold, far end, elevation m]
+      const vf = () => { const A = LL(AP, pr.rw[0]), B = LL(AP, pr.rw[1]), L = Math.hypot(B[0] - A[0], B[1] - A[1]);
+        return { nameA: pr.rwy, A, B, U: [(B[0] - A[0]) / L, (B[1] - A[1]) / L], eA: pr.rw[2], eB: pr.rw[2], L }; };
+      if (ri < 0 && !pr.rw) return;
+      const rw = ri < 0 ? vf() : frames(scen() !== 'ex')[ri], atA = rw.nameA === pr.rwy, P0 = atA ? rw.A : rw.B, e = atA ? rw.eA : rw.eB,
         dir = atA ? rw.U : [-rw.U[0], -rw.U[1]], mv = procShift(pr);
       // s metres from the threshold along the runway, on the terrain where it sits above the runway elevation
       const on = s => { const x = P0[0] + dir[0] * s, y = P0[1] + dir[1] * s; return [x, Math.max(e, demAt(x, y) ?? e), -y]; };
