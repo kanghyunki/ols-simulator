@@ -159,7 +159,7 @@ const AIRPORTS={
     ext:null,   // no preset extension: opens as built (the submitted demo scenario extends 14L by +500 m from here)
     fitAll:9000, fitRwy:2600,
     assume:'· 시단 좌표·표고(14L 103ft=31.4m, 32R 128ft=39.0m), AD 표고 39m, 활주로 2750×45m, CWY 60/120m: <b>PNG AIP AD 2 AYPY (30 OCT 2025)</b>.<br>'
-      +'· AYPY는 ILS 없음(비정밀) → OLS 제원은 Code 4 정밀 CAT I과 동일, OFZ는 참고용 옵션.<br>'
+      +'· 계기접근: ILS RWY 14L·32R(AD 2.24, Flight Supplement 23 JAN 2025) → 양 끝 Code 4 정밀 CAT I 제원, OFZ는 참고용 옵션.<br>'
       +'· 지형: <b>GEDTM30</b>(OpenLandMap 2025, 30m 지면고 DTM, CC BY 4.0) 내장 — 수목·건물을 제거한 지면고라 건물 높이(OSM)를 그 위에 더함. 지형 저촉·종단면 지형선·건물 지반고에 적용. 시단 표고 검증: 14L 31.5m·32R 38.7m (AIP 31.4·39.0m). v0 공개본(제작자 표기 "testing") — 설계 확정 시 측량 지형으로 교체 권장.<br>'
       +'· 확장 시 신설 시단 표고는 기존 말단과 동일 가정.'
   },

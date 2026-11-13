@@ -18,6 +18,9 @@ const PC404 = dms(33, 32, 42.3), PC404_E = dms(126, 33, 23.4), PETAA = dms(33, 3
 const ICJU_D53 = ['D5.3 ICJU', dms(33, 27, 18.5), dms(126, 22, 53.6), 1800], ICHE_D53 = ['D5.3 ICHE', dms(33, 33, 36.2), dms(126, 35, 8.4), 1800];
 const LOTKA = ['LOTKA', dms(33, 21, 11.1), dms(126, 6, 52.2), 6000], R066_D16 = ['R066 D16', 33.652393, 126.759075, 4000, 'ap'];
 const AKEVI = ['AKEVI', dms(34, 58, 29.0), dms(128, 57, 48.0), 3300], KEVOX = dms(35, 0, 51.7), KEVOX_E = dms(128, 43, 47.2);
+// AYPY thresholds (AD 2.12, 30 OCT 2025; THR 103 / 128 ft + 50 ft RDH) and TESEM (AIP SUP 7/19)
+const THR14L = ['THR 14L', -dms(9, 25, 51.18), dms(147, 12, 50.07), 153], THR32R = ['THR 32R', -dms(9, 27, 7.27), dms(147, 13, 37.11), 178];
+const TESEM = ['TESEM', -dms(9, 27, 39), dms(147, 13, 57), 4000];
 
 // AIP Republic of Korea RKSI AD CHART 2-62/64/67/69 (+ -1 data tabulation), ILS or LOC RWY 33L/33R/34L/34R CAT II & III,
 // AIRAC AIP AMDT 13/25, WEF 21 JAN 2026. THR elevation 23 ft; the path ends at THR + RDH.
@@ -230,6 +233,37 @@ export const PROCEDURES = {
       { ma: true, legs: [['THR 16', dms(53, 26, 13.16), -dms(6, 15, 43.12), 268], ['DW007', dms(53, 20, 3.5), -dms(6, 11, 15.7), 1200]] },
     ] },
   ],
+  // AIP Papua New Guinea Flight Supplement 23 JAN 2025, AYPY ILS RWY 14L (10 SEP 2020), ILS RWY 32R PROC A (21 APR 2022),
+  // RNAV (GNSS) RWY 14L / 32R (12 SEP 2019). The charts give fixes as distances from the threshold or DME, so they are placed
+  // along the runway axis from the AD 2.12 thresholds (tools/proc/aypy_fixes.py); TESEM is the published point (AIP SUP 7/19).
+  // Off-axis turn points are approximated ('ap'). Magnetic variation 6° E. AD 2.21.1: take-off RWY 14L, landing RWY 32R.
+  PMIA: [
+    { id: 'ILS14L', ops: 'dep', rwy: '14L', name: 'ILS RWY 14L', color: 0x3ddc84, paths: [
+      { legs: [['D7.8 IWG', -9.322805, 147.147122, 2500], ['D4.1 IWG', -9.375424, 147.179631, 1400], THR14L] },
+      // 142° DR track to 1 500 ft, right onto 322° climbing to 2 500 ft, hold at D9 PY
+      { ma: true, legs: [THR14L, ['1500 ft', -9.494871, 147.253472, 1500, 'ap'], ['322° turn', -9.507878, 147.231845, 2000, 'ap'],
+        ['D9 PY', -9.319961, 147.145365, 2500]] },
+    ] },
+    { id: 'RNP14L', ops: 'dep', rwy: '14L', name: 'RNAV (GNSS) RWY 14L', color: 0xfacc15, paths: [
+      { legs: [['VIMIB', -9.275873, 147.118136, 2900], ['YPYNF', -9.361203, 147.170844, 1700], ['YPYNZ', -9.389644, 147.188419, 1060], THR14L] },
+      // MAPt YPYNM at the threshold: DCT YPYNT, right DCT YPYNH (257° / 7.8 NM), track 323° climbing to 2 900 ft
+      { ma: true, legs: [THR14L, ['YPYNT', -9.501980, 147.257869, 900, 'ap'], ['YPYNH', -9.517789, 147.127125, 2000, 'ap'],
+        ['323° 2900', -9.460681, 147.092340, 2900, 'ap']] },
+    ] },
+    { id: 'ILS32R', ops: 'arr', rwy: '32R', name: 'ILS RWY 32R PROC A', color: 0x38bdf8, paths: [
+      // initial approach from TESEM: outbound 160° for 2.5 min, base turn onto the 322° localizer, FAF 6.2 PY DME
+      { legs: [TESEM, ['160° 2.5 min', -9.573957, 147.261104, 2500, 'ap'], ['LLZ join', -9.565772, 147.297326, 2000, 'ap'],
+        ['D6.0 IBB', -9.534492, 147.277975, 2000], THR32R] },
+      // 322° DR track to 2 500 ft, left turn direct TESEM crossing at 4 000 ft
+      { ma: true, legs: [THR32R, ['2500 ft', -9.380917, 147.183030, 2500, 'ap'], TESEM] },
+    ] },
+    { id: 'RNP32R', ops: 'arr', rwy: '32R', name: 'RNAV (GNSS) RWY 32R', color: 0xc084fc, paths: [
+      { legs: [['ISLOK', -9.632595, 147.338678, 2900], ['YPYSF', -9.533070, 147.277095, 2000], ['YPYSM', -9.476193, 147.241921, 720], THR32R] },
+      // MAPt YPYSM 1.7 NM before the threshold: DCT YPYST, left DCT YPYSH (184° / 12.0 NM), track 143° climbing to 2 900 ft
+      { ma: true, legs: [['YPYSM', -9.476193, 147.241921, 720], ['YPYST', -9.380914, 147.183034, 1700, 'ap'], ['YPYSH', -9.577741, 147.147837, 2900, 'ap'],
+        ['143° 2900', -9.634846, 147.182641, 2900, 'ap']] },
+    ] },
+  ],
 };
 
 // Source line shown under Flight procedures, per airport
@@ -239,4 +273,5 @@ export const PROC_NOTES = {
   RKPC: 'AIP RKPC AD 2-21/22/26/27, ILS RWY 07/25 (AMDT 5/26).',
   RKPK: 'AIP RKPK AD 2-21, ILS X RWY 36L (AMDT 11/26).',
   EIDW: 'AIP Ireland EIDW AD 2.24-27/30/33/36/39, ILS RWY 28L/28R/10L/10R/16 (AIRAC 2026-05-14).',
+  PMIA: 'AIP Papua New Guinea Flight Supplement (23 JAN 2025), ILS RWY 14L, ILS RWY 32R PROC A, RNAV (GNSS) RWY 14L/32R. Fixes given only as DME distances are placed along the runway axis; ≈ marks approximated turn points.',
 };

@@ -330,12 +330,15 @@ export function Simulator({ onHome }: { onHome: () => void }) {
             <Toggle size="sm" className={pill} pressed={ap.procs.every((p: any) => st?.proc?.includes(p.id))} onPressedChange={(v) => set({ proc: v ? ap.procs.map((p: any) => p.id) : [] })}>{t("All", "전체")}</Toggle>
             {/* one row per runway: a button per runway end (with Z/Y/X when an end has several), ends in the runway's order */}
             {ap.rwys.map((r: any) => { const ps = ap.procs.filter((p: any) => p.rwy === r.nameA).concat(ap.procs.filter((p: any) => p.rwy === r.nameB)); if (!ps.length) return null;
-              const ops = ps.find((p: any) => p.ops)?.ops;
+              const ops = ps.find((p: any) => p.ops)?.ops, mixed = ps.some((p: any) => p.ops && p.ops !== ops);   // mixed: one end for take-off, the other for landing
+              const role = (o: string) => o === "dep" ? t("departures", "이륙") : t("arrivals", "착륙");
               return <div key={r.id} className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <span className="w-[92px] text-[11px] leading-tight text-white/45">RWY {r.id}{ops && <span className="block text-[10px] text-white/35">{ops === "dep" ? t("departures only", "이륙 전용") : t("arrivals only", "착륙 전용")}</span>}</span>
+                <span className="w-[92px] text-[11px] leading-tight text-white/45">RWY {r.id}{ops && <span className="block text-[10px] text-white/35">{mixed
+                  ? [r.nameA, r.nameB].map((n: string) => { const o = ps.find((p: any) => p.rwy === n && p.ops)?.ops; return o ? `${n} ${role(o)}` : null; }).filter(Boolean).join(" · ")
+                  : ops === "dep" ? t("departures only", "이륙 전용") : t("arrivals only", "착륙 전용")}</span>}</span>
                 {ps.map((p: any) => (
                   <Toggle key={p.id} size="sm" className={pill} title={p.name} pressed={!!st?.proc?.includes(p.id)} onPressedChange={(v) => set({ proc: v ? [...(st?.proc ?? []), p.id] : (st?.proc ?? []).filter((x: string) => x !== p.id) })}>
-                    <span className="size-1.5 shrink-0 rounded-full" style={{ background: hex(p.color) }} />{p.rwy}{ps.filter((q: any) => q.rwy === p.rwy).length > 1 && /ILS ([XYZ]) /.exec(p.name) ? ` ${/ILS ([XYZ]) /.exec(p.name)![1]}` : ""}
+                    <span className="size-1.5 shrink-0 rounded-full" style={{ background: hex(p.color) }} />{p.rwy}{ps.filter((q: any) => q.rwy === p.rwy).length > 1 ? ` ${/ILS ([XYZ]) /.exec(p.name)?.[1] ?? p.name.split(" ")[0]}` : ""}
                   </Toggle>
                 ))}
               </div>; })}

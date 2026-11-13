@@ -9,15 +9,12 @@ const NB_DOM = [['737800', 0.5], ['A321-232', 0.35], ['A330-343', 0.1], ['7773ER
 const NB_REG = [['737800', 0.6], ['A321-232', 0.35], ['A330-343', 0.05]];                            // Korean regional / short international
 const NB_SMALL = [['737800', 0.55], ['A321-232', 0.3], ['ATR72', 0.15]];                             // small Korean airports (incl. turboprops)
 const GULF = [['737800', 0.25], ['A321-232', 0.3], ['A330-343', 0.1], ['7773ER', 0.15], ['7878R', 0.1], ['A350-941', 0.05], ['7478', 0.05]];
-const PNG_HUB = [['737800', 0.2], ['F10062', 0.3], ['ATR72', 0.5]];                                  // Air Niugini 737/F100, Dash 8, PNG Air ATR
-const PNG_MID = [['F10062', 0.35], ['ATR72', 0.65]];
-const PNG_SMALL = [['ATR72', 1]];
 const MOZ = [['737800', 0.4], ['A321-232', 0.1], ['7878R', 0.05], ['ATR72', 0.45]];                  // LAM 737/E190/Q400, regional carriers
 
 const KR = '항공정보포털 2025년 공항별 운항 (국내선 출발×2 + 국제선 출도착), 군 운항 제외';
 const kr = (annual, fleet, o = {}) => ({ annual, source: KR, fleet, evening: 0.15, night: 0.03, north: 0.5, ...o });
 const est = (annual, fleet, source, o = {}) => ({ annual, source, fleet, evening: 0.1, night: 0.02, north: 0.5, estimate: true, ...o });
-const PNG_EST = '운항 스케줄 기반 추정 (공식 운항 통계 확인 필요)';
+const oag = (annual, fleet, evening, night) => ({ annual, source: `OAG 2026 운항 스케줄 (${annual.toLocaleString('en-US')}회)`, fleet, evening, night, north: 0.5 });
 
 export const NOISE_TRAFFIC = {
   ICN: {
@@ -45,11 +42,24 @@ export const NOISE_TRAFFIC = {
   // Mozambique: Maputo from a logistics-cluster airport profile (year not stated); Beira and Pemba estimated from schedules
   FQMA: est(21234, MOZ, 'Logistics Cluster 공항 개요 (연도 미기재, 21,234회)'),
   FQBR: est(3000, MOZ, '운항 스케줄 기반 추정'), FQPB: est(1500, MOZ, '운항 스케줄 기반 추정'),
-  // Papua New Guinea: estimated from the published schedules — replace with NAC movement statistics when available
-  PMIA: est(36500, PNG_HUB, PNG_EST), AYNZ: est(10000, PNG_MID, PNG_EST), AYMH: est(6000, PNG_MID, PNG_EST), AYTK: est(4400, PNG_MID, PNG_EST),
-  AYWK: est(3600, PNG_SMALL, PNG_EST), AYMD: est(3600, PNG_SMALL, PNG_EST), AYGA: est(2200, PNG_SMALL, PNG_EST), AYHK: est(2200, PNG_SMALL, PNG_EST),
-  AYBK: est(2200, PNG_SMALL, PNG_EST), AYGN: est(2200, PNG_SMALL, PNG_EST), AYMO: est(1500, PNG_SMALL, PNG_EST), AYKV: est(1500, PNG_SMALL, PNG_EST),
-  AYVN: est(1500, PNG_SMALL, PNG_EST), AYKI: est(1500, PNG_SMALL, PNG_EST), AYDU: est(1100, PNG_SMALL, PNG_EST),
+  // Papua New Guinea: OAG 2026 schedules (tools/noise/oag_png.py). Movements and evening (19–22 h) / night (22–07 h) shares from
+  // the scheduled local times; types mapped to the bundled ANP stand-ins: ATR 72 and Dash 8 → ATR72, Fokker 70/100 and A220 → F10062,
+  // 737-800 → 737800, 767-300 → A330-343.
+  PMIA: oag(43427, [['ATR72', 0.58], ['F10062', 0.24], ['737800', 0.14], ['A330-343', 0.04]], 0.03, 0.08),
+  AYNZ: oag(10855, [['ATR72', 0.7], ['737800', 0.19], ['F10062', 0.11]], 0, 0.065),
+  AYMH: oag(7208, [['ATR72', 0.67], ['F10062', 0.33]], 0, 0),
+  AYTK: oag(8040, [['ATR72', 0.65], ['F10062', 0.35]], 0, 0.115),
+  AYWK: oag(5669, [['ATR72', 0.69], ['F10062', 0.31]], 0, 0),
+  AYMD: oag(3596, [['ATR72', 0.91], ['F10062', 0.09]], 0, 0.085),
+  AYGA: oag(2902, [['ATR72', 0.97], ['F10062', 0.03]], 0, 0),
+  AYHK: oag(4543, [['ATR72', 1]], 0, 0.053),
+  AYBK: oag(1896, [['F10062', 0.52], ['ATR72', 0.48]], 0, 0),
+  AYGN: oag(1148, [['ATR72', 0.37], ['F10062', 0.35], ['737800', 0.28]], 0, 0),
+  AYMO: oag(1019, [['F10062', 0.7], ['737800', 0.3]], 0, 0),
+  AYKV: oag(3069, [['F10062', 0.59], ['ATR72', 0.3], ['737800', 0.11]], 0, 0.37),     // first departures 06:00–06:30
+  AYVN: oag(3096, [['ATR72', 0.53], ['F10062', 0.47]], 0, 0.497),                     // first departures 06:00–06:30
+  AYKI: oag(2057, [['ATR72', 1]], 0, 0),
+  AYDU: oag(1387, [['ATR72', 1]], 0, 0),
 };
 
 // Contour bands (Lden dB, lower bound) and labels. Korea: 공항소음방지법 시행령 제2조 / 시행규칙 제3조 (Lden, from 2023).
