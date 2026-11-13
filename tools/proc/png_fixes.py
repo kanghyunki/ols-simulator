@@ -64,6 +64,12 @@ add('AYGA', 'RNPZ35L', '35L', 'RNAV-Z (GNSS) RWY 35L', G, [
   [fx('YGASA', p.back(I, 323, 10.3), 12600), fx('YGASI', I, 9700), fx('YGASF', p.axis(3.8 + 5.8), 8200), fx('YGASG', p.axis(3.8 + 4.2), 7700),
    fx('YGASZ', M, 6400), p.thr],
   ('ma', [fx('YGASZ', M, 6400), fx('YGASH', H, 8000, True), fx('104° 12600', p.fwd(H, 104, 8), 12600, True)])])
+# RNAV-Y (GNSS) RWY 35L (05 OCT 2023): the same IF / FAF / SDF (14.3 / 9.6 / 8.0 NM from the threshold) and YGASH, MAPt YGASY 3.0 NM out
+MY = p.axis(3.0)
+add('AYGA', 'RNPY35L', '35L', 'RNAV-Y (GNSS) RWY 35L', B, [
+  [fx('YGASA', p.back(I, 323, 10.5), 12600), fx('YGASI', I, 9700), fx('YGASF', p.axis(9.6), 8200), fx('YGASG', p.axis(8.0), 7700),
+   fx('YGASY', MY, 6200), p.thr],
+  ('ma', [fx('YGASY', MY, 6200), fx('YGASH', H, 8000, True), fx('104° 12600', p.fwd(H, 104, 8), 12600, True)])])
 
 # KAVIENG (AYKV) RNAV (GNSS) RWY 30 (12 SEP 2019), var 6°E
 p = Proc('AYKV', '30', 6, 15); I = p.axis(10.1); H = p.past(5)

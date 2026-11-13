@@ -278,7 +278,7 @@ export const PROC_NOTES = {
   EIDW: 'AIP Ireland EIDW AD 2.24-27/30/33/36/39, ILS RWY 28L/28R/10L/10R/16 (AIRAC 2026-05-14).',
   PMIA: 'AIP Papua New Guinea Flight Supplement (23 JAN 2025), ILS RWY 14L, ILS RWY 32R PROC A, RNAV (GNSS) RWY 14L/32R, VOR/DME RWY 14L/32R, VOR RWY 32R. Fixes given only as DME distances are placed along the runway axis, PY VOR from the charts\' MAPt distances; ≈ marks approximated turn points.',
   ...Object.fromEntries(Object.entries({
-    AYBK: 'RNAV (GNSS) RWY 04', AYDU: 'RNAV (GNSS) RWY 14/32', AYGA: 'RNAV-Z (GNSS) RWY 35L', AYKV: 'RNAV (GNSS) RWY 30, DVOR/DME RWY 12', AYKI: 'RNAV (GNSS) RWY 07',
+    AYBK: 'RNAV (GNSS) RWY 04', AYDU: 'RNAV (GNSS) RWY 14/32', AYGA: 'RNAV-Y / RNAV-Z (GNSS) RWY 35L', AYKV: 'RNAV (GNSS) RWY 30, DVOR/DME RWY 12', AYKI: 'RNAV (GNSS) RWY 07',
     AYNZ: 'RNAV (GNSS) RWY 27/09, VOR/DME RWY 09/27, VOR RWY 09', AYMD: 'RNAV (GNSS) RWY 25/07', AYTK: 'RNAV (GNSS) RWY 28/10',
     AYWK: 'RNAV (GNSS) A, circling', AYGN: 'RNAV (GNSS) A, circling', AYHK: 'RNAV (GNSS) A, circling', AYMH: 'RNAV (GNSS) A, circling',
     AYMO: 'NDB, circling', AYVN: 'NDB, circling',
