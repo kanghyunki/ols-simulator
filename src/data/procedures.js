@@ -26,7 +26,6 @@ const TESEM = ['TESEM', -dms(9, 27, 39), dms(147, 13, 57), 4000];
 // AIP Republic of Korea RKSI AD CHART 2-62/64/67/69 (+ -1 data tabulation), ILS or LOC RWY 33L/33R/34L/34R CAT II & III,
 // AIRAC AIP AMDT 13/25, WEF 21 JAN 2026. THR elevation 23 ft; the path ends at THR + RDH.
 export const PROCEDURES = {
-  ...PNG_PROCEDURES,   // the other PNG aerodromes (tools/proc/png_fixes.py)
   ICN: [
     { id: 'ILS33L', ops: 'dep', rwy: '33L', name: 'ILS RWY 33L', color: 0x3ddc84, paths: [
       { legs: [['PAMBI', PAMBI, PAMBI_E, 3600], ['POSOK', dms(37, 14, 30.3), dms(126, 38, 56.6), 3600], ['LEGUN', dms(37, 18, 14.5), dms(126, 35, 38.6), 3600],
@@ -267,6 +266,8 @@ export const PROCEDURES = {
     ] },
   ],
 };
+// the other PNG aerodromes, and the PNG VOR procedures (tools/proc/png_fixes.py), after any procedures already listed here
+for (const [k, v] of Object.entries(PNG_PROCEDURES)) PROCEDURES[k] = [...(PROCEDURES[k] || []), ...v];
 
 // Source line shown under Flight procedures, per airport
 export const PROC_NOTES = {
@@ -275,10 +276,10 @@ export const PROC_NOTES = {
   RKPC: 'AIP RKPC AD 2-21/22/26/27, ILS RWY 07/25 (AMDT 5/26).',
   RKPK: 'AIP RKPK AD 2-21, ILS X RWY 36L (AMDT 11/26).',
   EIDW: 'AIP Ireland EIDW AD 2.24-27/30/33/36/39, ILS RWY 28L/28R/10L/10R/16 (AIRAC 2026-05-14).',
-  PMIA: 'AIP Papua New Guinea Flight Supplement (23 JAN 2025), ILS RWY 14L, ILS RWY 32R PROC A, RNAV (GNSS) RWY 14L/32R. Fixes given only as DME distances are placed along the runway axis; ≈ marks approximated turn points.',
+  PMIA: 'AIP Papua New Guinea Flight Supplement (23 JAN 2025), ILS RWY 14L, ILS RWY 32R PROC A, RNAV (GNSS) RWY 14L/32R, VOR/DME RWY 14L/32R, VOR RWY 32R. Fixes given only as DME distances are placed along the runway axis, PY VOR from the charts\' MAPt distances; ≈ marks approximated turn points.',
   ...Object.fromEntries(Object.entries({
-    AYBK: 'RNAV (GNSS) RWY 04', AYDU: 'RNAV (GNSS) RWY 14/32', AYGA: 'RNAV-Z (GNSS) RWY 35L', AYKV: 'RNAV (GNSS) RWY 30', AYKI: 'RNAV (GNSS) RWY 07',
-    AYNZ: 'RNAV (GNSS) RWY 27/09', AYMD: 'RNAV (GNSS) RWY 25/07', AYTK: 'RNAV (GNSS) RWY 28/10',
+    AYBK: 'RNAV (GNSS) RWY 04', AYDU: 'RNAV (GNSS) RWY 14/32', AYGA: 'RNAV-Z (GNSS) RWY 35L', AYKV: 'RNAV (GNSS) RWY 30, DVOR/DME RWY 12', AYKI: 'RNAV (GNSS) RWY 07',
+    AYNZ: 'RNAV (GNSS) RWY 27/09, VOR/DME RWY 09/27, VOR RWY 09', AYMD: 'RNAV (GNSS) RWY 25/07', AYTK: 'RNAV (GNSS) RWY 28/10',
     AYWK: 'RNAV (GNSS) A, circling', AYGN: 'RNAV (GNSS) A, circling', AYHK: 'RNAV (GNSS) A, circling', AYMH: 'RNAV (GNSS) A, circling',
     AYMO: 'NDB, circling', AYVN: 'NDB, circling',
   }).map(([k, v]) => [k, `AIP Papua New Guinea Flight Supplement (23 JAN 2025), ${v}. Fixes placed from the thresholds by chart distance and track; ≈ marks approximated points.`])),

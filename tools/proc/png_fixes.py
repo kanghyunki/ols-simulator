@@ -40,7 +40,7 @@ class Proc:
 def fx(name, p, ft, ap=False): return [name, p[0], p[1], ft] + (['ap'] if ap else [])
 
 P = {}   # airport → list of procedures (id, rwy, name, colour, paths)
-def add(ap, pid, rwy, name, color, paths): P.setdefault(ap, []).append((pid, rwy, name, color, paths))
+def add(ap, pid, rwy, name, color, paths, ops=None): P.setdefault(ap, []).append((pid, rwy, name, color, paths, ops))
 G, B, Y, V = 0x3ddc84, 0x38bdf8, 0xfacc15, 0xc084fc
 
 # BUKA (AYBK) RNAV (GNSS) RWY 04 (12 SEP 2019), var 7°E. Runway 04 is the 05 end in airports.js.
@@ -161,17 +161,60 @@ add('AYVN', 'NDB', '30', 'NDB', Y, [
    fx('287° inbound', p.back(p.T, 287, 4), 2500, True), fx('MDA', p.back(p.T, 287, 1), 1300, True), p.thr],
   ('ma', [p.thr, fx('VNO NDB', N, 1300, True), fx('005° 3500', p.fwd(N, 5, 5), 3500, True)])])
 
+# ---- VOR procedures. The VOR positions come from the charts themselves: PY from the MAPt's distance to the threshold and
+# its DME (the VOR/DME 14L and 32R charts agree within 0.01 NM), NZ 1.9 DME at THR 27 (VOR/DME 27), KVG 1.0 DME at THR 12.
+P2, P3, P4 = 0xf472b6, 0x2dd4bf, 0xa3e635
+# PORT MORESBY/JACKSONS (AYPY = PMIA), var 6°E. Take-off 14L / landing 32R as the other PMIA procedures (AD 2.21.1).
+p = Proc('PMIA', '14L', 6, 103); M = p.fwd(p.T, 322, 2.5); PY = p.fwd(M, 152, 3.7); F = p.fwd(PY, 332, 10)
+add('PMIA', 'VORDME14L', '14L', 'VOR/DME RWY 14L', P2, [      # 21 APR 2022
+  [fx('PY VOR', PY, 4000), fx('R317 outbound', p.fwd(PY, 317, 9), 3000, True), fx('base turn', p.fwd(PY, 325, 11), 2500, True),
+   fx('10 DME', F, 2500), fx('3.7 DME', M, 850), p.thr],
+  # 142° DR track to 2 500 ft, right turn direct PY, climb to 4 000 ft
+  ('ma', [p.thr, fx('2500 ft', p.fwd(p.T, 142, 5), 2500, True), fx('PY VOR', PY, 4000)])], ops='dep')
+p = Proc('PMIA', '32R', 6, 128); M = p.fwd(p.T, 142, 2.6); F = p.fwd(PY, 130, 8)
+for pid, name, col, fafn, mapn, mda, sub in (('VORDME32R', 'VOR/DME RWY 32R', P3, '8 DME', '3 DME', 800, M),     # 27 APR 2017
+                                             ('VOR32R', 'VOR RWY 32R', P4, '310° inbound', 'PY VOR', 1000, PY)):  # timed: 148° 2.5 min, MAPt over PY
+    add('PMIA', pid, '32R', name, col, [
+      [fx('PY VOR', PY, 4000), fx('R148 outbound', p.fwd(PY, 148, 8.3), 3000, True), fx('base turn', p.fwd(PY, 140, 9.5), 2400, True),
+       fx(fafn, F, 2400, fafn != '8 DME'), fx(mapn, sub, mda), p.thr],
+      ('ma', [p.thr, fx('2500 ft', p.fwd(p.T, 322, 5), 2500, True), fx('PY VOR', PY, 4000)])], ops='arr')
+# LAE/NADZAB (AYNZ), var 5.4°E (VOR charts)
+p = Proc('AYNZ', '09', 5.4, 238); q = Proc('AYNZ', '27', 5.4, 216); NZ = q.past(1.9)
+LARID_N = q.back(q.axis(11.1), 328, 10)       # the RNAV LARID: 20.2 DME / 114.5° from NZ (chart 20 DME / 115°)
+add('AYNZ', 'VORDME09', '09', 'VOR/DME RWY 09 (via WESFI)', P2, [   # 10 SEP 2020
+  [fx('WESFI 18 DME', p.fwd(NZ, 268, 18), 6000), fx('IF 10 DME', p.fwd(NZ, 268, 10), 2600), fx('FAF 5 DME', p.fwd(NZ, 268, 5), 1500),
+   fx('MAPt 0.6 DME', p.fwd(NZ, 268, 0.6), 650), p.thr],
+  # 088° DR track to 1 500 ft, right turn direct NZ, track 268° to WESFI, climb to 6 000 ft
+  ('ma', [p.thr, fx('1500 ft', p.fwd(NZ, 88, 4), 1500, True), fx('NZ VOR', NZ, 3000, True), fx('WESFI 18 DME', p.fwd(NZ, 268, 18), 6000)])])
+FZ = p.fwd(NZ, 88, 6.7); IF27 = q.back(FZ, 306, 5.6)
+add('AYNZ', 'VORDME27', '27', 'VOR/DME RWY 27 (via LARID)', P3, [   # 10 SEP 2020
+  [fx('LARID 20 DME', LARID_N, 6300), fx('IF 12 DME', IF27, 3000), fx('FAF 6.7 DME', FZ, 1700), q.thr],
+  # 268° DR track to 2 000 ft, left turn direct NZ, track 115° to LARID, climb to 6 300 ft
+  ('ma', [q.thr, fx('2000 ft', q.past(3), 2000, True), fx('NZ VOR', NZ, 3000, True), fx('LARID 20 DME', LARID_N, 6300)])])
+add('AYNZ', 'VOR09', '09', 'VOR RWY 09', P4, [                      # 10 SEP 2020: outbound 285° 4.5 min, left turn, inbound 088°, MAPt over NZ
+  [fx('NZ VOR', NZ, 6000), fx('285° 4.5 min', p.fwd(NZ, 285, 11), 3500, True), fx('left turn', p.fwd(NZ, 279, 12.5), 2500, True),
+   fx('088° inbound', p.fwd(NZ, 268, 8), 2500, True), fx('NZ VOR (MAPt)', NZ, 750), p.thr],
+  ('ma', [p.thr, fx('1500 ft', p.fwd(NZ, 88, 3), 1500, True), fx('R115', p.fwd(NZ, 115, 8), 3500, True), fx('LARID', LARID_N, 6300)])])
+# KAVIENG (AYKV) DVOR/DME RWY 12 (12 SEP 2019), var 6°E: KVG 1.0 DME at THR 12, outbound 321°/314° 3 min, inbound 122°
+p = Proc('AYKV', '12', 6, 12); KVG = p.past(1.0)
+add('AYKV', 'DVOR12', '12', 'DVOR/DME RWY 12', P2, [
+  [fx('KVG DVOR', KVG, 2500), fx('R321 3 min', p.fwd(KVG, 318, 8), 2000, True), fx('base turn', p.fwd(KVG, 308, 8.5), 1500, True),
+   fx('D6.0 KVG', p.fwd(KVG, 302, 6), 1200), fx('D2.0 KVG', p.fwd(KVG, 302, 2), 490), p.thr],
+  # track 122° climbing to 2 500 ft, passing 5.5 DME turn left direct KVG
+  ('ma', [p.thr, fx('D5.5 KVG', p.fwd(KVG, 122, 5.5), 1800, True), fx('KVG DVOR', KVG, 2500)])])
+
 # ---- write src/data/procedures-png.js
 def leg(l):
     n, la, lo, ft, *f = l
     return f"['{n}', {la:.6f}, {lo:.6f}, {ft}{', ' + repr(f[0]) if f else ''}]"
 out = ['// Generated by tools/proc/png_fixes.py from the AIP Papua New Guinea Flight Supplement (23 JAN 2025). Do not edit by hand.',
        '// Fixes are placed from the airports.js thresholds by chart distance and track; \'ap\' marks a turn point the chart only implies.',
+       '// PMIA here holds only its VOR procedures; procedures.js appends them to the ILS / RNAV ones.',
        'export const PNG_PROCEDURES = {']
 for ap, procs in P.items():
     out.append(f'  {ap}: [')
-    for pid, rwy, name, col, paths in procs:
-        out.append(f"    {{ id: '{pid}', rwy: '{rwy}', name: '{name}', color: 0x{col:06x}, paths: [")
+    for pid, rwy, name, col, paths, ops in procs:
+        out.append(f"    {{ id: '{pid}', {f"ops: '{ops}', " if ops else ''}rwy: '{rwy}', name: '{name}', color: 0x{col:06x}, paths: [")
         for path in paths:
             ma = isinstance(path, tuple); legs = path[1] if ma else path
             out.append(f"      {{ {'ma: true, ' if ma else ''}legs: [{', '.join(leg(l) for l in legs)}] }},")
@@ -181,7 +224,7 @@ out.append('};')
 open(os.path.join(ROOT, 'src', 'data', 'procedures-png.js'), 'w', encoding='utf-8', newline='\n').write('\n'.join(out) + '\n')
 # self-check: every final ends at its threshold, every feeder joins a fix of the main path, all inside 60 NM of the runway
 for ap, procs in P.items():
-    for pid, rwy, name, col, paths in procs:
+    for pid, rwy, name, col, paths, ops in procs:
         T = THR[(ap, rwy)][0]; main = paths[0]; names = {l[0] for l in main}
         assert main[-1][0] in ('THR ' + rwy,) or main[-1][-1] == 'ap', (ap, pid)
         for path in paths[1:]:
